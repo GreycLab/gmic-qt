@@ -64,7 +64,9 @@ VERSION = 0.0.0
 PKGCONFIG += fftw3 zlib libpng libjpeg libcurl
 
 equals( HOST, "gimp" ) {
-  PKGCONFIG += gimp-2.0
+  GIMPTOOL = $$system(command -v gimptool-3.0 >/dev/null && echo gimptool-3.0 || echo gimptool-2.0)
+  GIMPVER = $$system(echo `$$GIMPTOOL --version` | cut -d. -f1)
+  PKGCONFIG += gimp-$${GIMPVER}.0
 }
 
 equals( HOST, "8bf") {
