@@ -1,10 +1,10 @@
 #
 # Set HOST variable to define target host software.
-# Possible values are "none", "gimp", "gimp3" (experimental), and "paintdotnet"
+# Possible values are "none", "gimp2", "gimp3" and "paintdotnet"
 #
 #
 
-!defined(HOST,var) { HOST = gimp }
+!defined(HOST,var) { HOST = gimp2 }
 
 !defined(GMIC_DYNAMIC_LINKING,var) { GMIC_DYNAMIC_LINKING = off }
 
@@ -63,7 +63,7 @@ VERSION = 0.0.0
 
 PKGCONFIG += fftw3 zlib libpng libjpeg libcurl
 
-equals( HOST, "gimp" ) {
+equals( HOST, "gimp2" ) {
   PKGCONFIG += gimp-2.0
 }
 
@@ -196,7 +196,7 @@ macx {
   message( Unknown platform )
 }
 
-equals( HOST, "gimp")|equals( HOST, "gimp3") {
+equals( HOST, "gimp2")|equals( HOST, "gimp3") {
  TARGET = gmic_gimp_qt
  SOURCES += src/Host/Gimp/host_gimp.cpp
  DEFINES += GMIC_HOST=gimp
