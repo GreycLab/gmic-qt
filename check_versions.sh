@@ -19,6 +19,14 @@ function die()
 (( $# == 0 )) && usage
 [[ -d "$1" ]] || die "$1 is not an existing directory"
 
+# no param
+function gimp_version()
+{
+  local gimptool=$(command -v gimptool-3.0 >/dev/null && echo gimptool-3.0 || echo gimptool-2.0)
+  local version=$(echo `$gimptool --version` | cut -d. -f1)
+  echo ${version//* }
+}
+
 # @param folder
 function gmic_version()
 {
@@ -48,6 +56,11 @@ function stdlib_version()
   version=${version//.}
   echo ${version}
 }
+
+if [[ "$2" == gimp ]]; then
+  gimp_version
+  exit 0
+fi
 
 if [[ "$2" == gmic ]]; then
   gmic_version "$1"
