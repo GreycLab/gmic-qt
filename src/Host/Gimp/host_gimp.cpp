@@ -348,83 +348,44 @@ void get_output_layer_props(const char * const s, GimpLayerModeEffects & blendmo
   }
 }
 
+_GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
+{
+  static std::vector<_GimpLayerPtr> layersId;
+  std::stack<_GimpLayerPtr> idStack;
+
 #if GIMP_CHECK_VERSION(3, 0, 0)
-_GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
-{
-  // samj ajout pour version G'MIC 3.4.3 et GIMP 3.0.0-RC1
-  GimpLayer **Calques;
-  gint Nb_Calques = 0;
-  GimpItem **CalquesChildren;
-  gint Nb_Calques_Children = 0;
-
-  Calques = gimp_image_get_layers (imageId);
-  Nb_Calques = (gimp_core_object_array_get_length ((GObject **) Calques));  // UTILISÉ
-
-  // FIN samj ajout pour version G'MIC 3.4.3 et GIMP 3.0.0-RC1
-
-  static std::vector<_GimpLayerPtr> layersId;
-  std::stack<_GimpLayerPtr> idStack;
-
+  GimpLayer ** layersList = gimp_image_get_layers(imageId);
+  int layersCount = gimp_core_object_array_get_length((GObject **)layersList);
   _GimpLayerPtr * layers = gimp_image_get_layers(imageId);
-
-  // samj Modification variable Nb_Calques pour version G'MIC 3.4.3 et GIMP 3.0.0-RC1
-  for (int i = Nb_Calques - 1; i >= 0; --i) {
-
-    idStack.push(layers[i]);
-  }
-
-  layersId.clear();
-
-  int childCount = 0;
-  while (!idStack.empty()) {
-
-	// samj modification
-    Nb_Calques_Children = 0;
-    childCount = 0;
-
-    if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
-      CalquesChildren = gimp_item_get_children (GIMP_ITEM (idStack.top()));
-      for (int i = 0; _GIMP_LAYER(CalquesChildren[i]) != NULL; i++) {
-        Nb_Calques_Children++ ;
-      }
-      g_free (CalquesChildren);
-    }
-	childCount = Nb_Calques_Children;
-	// samj FIN modification
-
-    if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
-      _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()));
-      idStack.pop();
-      for (int i = childCount - 1; i >= 0; --i) {
-        idStack.push(_GIMP_LAYER(children[i])); // TODO: Check if layers can have non-layer children.
-      }
-    } else {
-      layersId.push_back(idStack.top());
-      idStack.pop();
-    }
-  }
-  *count = layersId.size();
-  return layersId.data();
-}
-
 #else
-
-_GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
-{
-  static std::vector<_GimpLayerPtr> layersId;
-  std::stack<_GimpLayerPtr> idStack;
-
   int layersCount = 0;
   _GimpLayerPtr * layers = gimp_image_get_layers(imageId, &layersCount);
+#endif
   for (int i = layersCount - 1; i >= 0; --i) {
     idStack.push(layers[i]);
   }
 
   layersId.clear();
+
   while (!idStack.empty()) {
+    int childCount = 0;
+#if GIMP_CHECK_VERSION(3, 0, 0)
     if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
-      int childCount = 0;
+      GimpItem **childLayers = gimp_item_get_children(GIMP_ITEM(idStack.top()));
+      for (int i = 0; _GIMP_LAYER(childLayers[i]) != NULL; ++i) {
+        ++childCount;
+      }
+      g_free(childLayers);
+    }
+#endif
+
+    if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
+
+#if GIMP_CHECK_VERSION(3, 0, 0)
+      _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()));
+#else
       _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()), &childCount);
+#endif
       idStack.pop();
       for (int i = childCount - 1; i >= 0; --i) {
         idStack.push(_GIMP_LAYER(children[i])); // TODO: Check if layers can have non-layer children.
@@ -437,8 +398,6 @@ _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
   *count = layersId.size();
   return layersId.data();
 }
-
-#endif
 
 template <typename T> void image2uchar(gmic_library::gmic_image<T> & img)
 {
