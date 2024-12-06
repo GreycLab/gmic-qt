@@ -42,10 +42,10 @@
 
 #define _gimp_image_get_item_position gimp_image_get_item_position
 
-#if !GIMP_CHECK_VERSION(2, 7, 15)
-#define _gimp_item_get_visible gimp_drawable_get_visible
-#else
+#if GIMP_CHECK_VERSION(2, 7, 15)
 #define _gimp_item_get_visible gimp_item_get_visible
+#else
+#define _gimp_item_get_visible gimp_drawable_get_visible
 #endif
 
 #if GIMP_CHECK_VERSION(2, 99, 6)
@@ -64,19 +64,7 @@
 #define _gimp_drawable_get_offsets gimp_drawable_offsets
 #endif
 
-#if !GIMP_CHECK_VERSION(2, 99, 0)
-#define _GimpImagePtr int
-#define _GimpLayerPtr int
-#define _GimpItemPtr int
-#define _GIMP_ITEM(item) (item)
-#define _GIMP_DRAWABLE(drawable) (drawable)
-#define _GIMP_LAYER(layer) (layer)
-#define _GIMP_NULL_LAYER -1
-#define _GIMP_LAYER_IS_NOT_NULL(layer) ((layer) >= 0)
-#define _gimp_top_layer 0
-
-#else
-
+#if GIMP_CHECK_VERSION(2, 99, 0)
 #define _GimpImagePtr GimpImage *
 #define _GimpLayerPtr GimpLayer *
 #define _GimpItemPtr GimpItem *
@@ -86,7 +74,6 @@
 #define _GIMP_NULL_LAYER NULL
 #define _GIMP_LAYER_IS_NOT_NULL(layer) ((layer) != NULL)
 #define _gimp_top_layer gimp_layer_get_by_id(0)
-
 #define PLUG_IN_PROC "plug-in-gmic-qt"
 
 typedef struct _GmicQtPlugin GmicQtPlugin;
@@ -112,15 +99,7 @@ static GimpProcedure * gmic_qt_create_procedure(GimpPlugIn * plug_in, const gcha
 #if GIMP_CHECK_VERSION(3, 0, 0)
 static GimpValueArray * gmic_qt_run(GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data);
 #else
-#if !GIMP_CHECK_VERSION(2, 99, 6)
-static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable * drawables, const GimpValueArray * args, gpointer run_data);
-#else
-#if !GIMP_CHECK_VERSION(2, 99, 19)
-static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, const GimpValueArray * args, gpointer run_data);
-#else
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, GimpProcedureConfig *config, gpointer run_data);
-#endif
-#endif
 #endif
 
 G_DEFINE_TYPE(GmicQtPlugin, gmic_qt, GIMP_TYPE_PLUG_IN)
@@ -137,16 +116,26 @@ static void gmic_qt_class_init(GmicQtPluginClass * klass)
 
 static void gmic_qt_init(GmicQtPlugin * gmic_qt) {}
 
+#else
+#define _GimpImagePtr int
+#define _GimpLayerPtr int
+#define _GimpItemPtr int
+#define _GIMP_ITEM(item) (item)
+#define _GIMP_DRAWABLE(drawable) (drawable)
+#define _GIMP_LAYER(layer) (layer)
+#define _GIMP_NULL_LAYER -1
+#define _GIMP_LAYER_IS_NOT_NULL(layer) ((layer) >= 0)
+#define _gimp_top_layer 0
 #endif
 
 namespace GmicQtHost
 {
 const QString ApplicationName = QString("GIMP %1.%2").arg(GIMP_MAJOR_VERSION).arg(GIMP_MINOR_VERSION);
 const char * const ApplicationShortname = GMIC_QT_XSTRINGIFY(GMIC_HOST);
-#if !GIMP_CHECK_VERSION(2, 9, 0)
-const bool DarkThemeIsDefault = false;
-#else
+#if GIMP_CHECK_VERSION(2, 9, 0)
 const bool DarkThemeIsDefault = true;
+#else
+const bool DarkThemeIsDefault = false;
 #endif
 
 } // namespace GmicQtHost
@@ -453,14 +442,8 @@ void showMessage(const char * message)
 
 void applyColorProfile(gmic_library::gmic_image<float> & image)
 {
-#if !GIMP_CHECK_VERSION(2, 9, 0)
   unused(image);
-// SWAP RED<->GREEN CHANNELS : FOR TESTING PURPOSE ONLY!
-//  cimg_forXY(image,x,y) {
-//    std::swap(image(x,y,0,0),image(x,y,0,1));
-//  }
-#else
-  unused(image);
+#if GIMP_CHECK_VERSION(2, 9, 0)
 //  GimpColorProfile * const img_profile = gimp_image_get_effective_color_profile(gmic_qt_gimp_image_id);
 //  GimpColorConfig * const color_config = gimp_get_color_configuration();
 //  if (!img_profile || !color_config) {
@@ -485,6 +468,11 @@ void applyColorProfile(gmic_library::gmic_image<float> & image)
 //                                        corrected.height()*corrected.depth());
 //    (corrected.permute_axes("yzcx")*=255).cut(0,255).move_to(image);
 //    g_object_unref(transform);
+#else
+// SWAP RED<->GREEN CHANNELS : FOR TESTING PURPOSE ONLY!
+//  cimg_forXY(image,x,y) {
+//    std::swap(image(x,y,0,0),image(x,y,0,1));
+//  }
 #endif
 }
 
@@ -689,15 +677,7 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
     QString name = QString("mode(%1),opacity(%2),pos(%3,%4),name(%5)").arg(blendingMode2String(blendMode)).arg(opacity).arg(xPos).arg(yPos).arg(noParenthesisName);
     QByteArray ba = name.toUtf8();
     gmic_image<char>::string(ba.constData()).move_to(imageNames[l]);
-#if !GIMP_CHECK_VERSION(2, 9, 0)
-    GimpDrawable * drawable = gimp_drawable_get(inputLayers[l]);
-    GimpPixelRgn region;
-    gimp_pixel_rgn_init(&region, drawable, ix, iy, iw, ih, false, false);
-    gmic_image<unsigned char> img(spectrum, iw, ih);
-    gimp_pixel_rgn_get_rect(&region, img, ix, iy, iw, ih);
-    gimp_drawable_detach(drawable);
-    img.permute_axes("yzcx");
-#else
+#if GIMP_CHECK_VERSION(2, 9, 0)
     GeglRectangle rect;
     gegl_rectangle_set(&rect, ix, iy, iw, ih);
     GeglBuffer * buffer = gimp_drawable_get_buffer(_GIMP_DRAWABLE(inputLayers[l]));
@@ -706,6 +686,14 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
     gegl_buffer_get(buffer, &rect, 1, babl_format(format), img.data(), 0, GEGL_ABYSS_NONE);
     (img *= 255).permute_axes("yzcx");
     g_object_unref(buffer);
+#else
+    GimpDrawable * drawable = gimp_drawable_get(inputLayers[l]);
+    GimpPixelRgn region;
+    gimp_pixel_rgn_init(&region, drawable, ix, iy, iw, ih, false, false);
+    gmic_image<unsigned char> img(spectrum, iw, ih);
+    gimp_pixel_rgn_get_rect(&region, img, ix, iy, iw, ih);
+    gimp_drawable_detach(drawable);
+    img.permute_axes("yzcx");
 #endif
     img.move_to(images[l]);
   }
@@ -787,17 +775,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
         gmic_library::gmic_image<gmic_pixel_type> & img = images[p];
         GmicQt::calibrateImage(img, inputLayerDimensions(p, 3), false);
         if (gimp_drawable_mask_intersect(_GIMP_DRAWABLE(inputLayers[p]), &rgn_x, &rgn_y, &rgn_width, &rgn_height)) {
-#if !GIMP_CHECK_VERSION(2, 9, 0)
-          GimpDrawable * drawable = gimp_drawable_get(inputLayers[p]);
-          GimpPixelRgn region;
-          gimp_pixel_rgn_init(&region, drawable, rgn_x, rgn_y, rgn_width, rgn_height, true, true);
-          image2uchar(img);
-          gimp_pixel_rgn_set_rect(&region, (guchar *)img.data(), rgn_x, rgn_y, rgn_width, rgn_height);
-          gimp_drawable_flush(drawable);
-          gimp_drawable_merge_shadow(inputLayers[p], true);
-          gimp_drawable_update(inputLayers[p], rgn_x, rgn_y, rgn_width, rgn_height);
-          gimp_drawable_detach(drawable);
-#else
+#if GIMP_CHECK_VERSION(2, 9, 0)
           GeglRectangle rect;
           gegl_rectangle_set(&rect, rgn_x, rgn_y, rgn_width, rgn_height);
           GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(inputLayers[p]));
@@ -807,16 +785,26 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           g_object_unref(buffer);
           gimp_drawable_merge_shadow(_GIMP_DRAWABLE(inputLayers[p]), true);
           gimp_drawable_update(_GIMP_DRAWABLE(inputLayers[p]), 0, 0, img.width(), img.height());
+#else
+          GimpDrawable * drawable = gimp_drawable_get(inputLayers[p]);
+          GimpPixelRgn region;
+          gimp_pixel_rgn_init(&region, drawable, rgn_x, rgn_y, rgn_width, rgn_height, true, true);
+          image2uchar(img);
+          gimp_pixel_rgn_set_rect(&region, (guchar *)img.data(), rgn_x, rgn_y, rgn_width, rgn_height);
+          gimp_drawable_flush(drawable);
+          gimp_drawable_merge_shadow(inputLayers[p], true);
+          gimp_drawable_update(inputLayers[p], rgn_x, rgn_y, rgn_width, rgn_height);
+          gimp_drawable_detach(drawable);
 #endif
           gimp_layer_set_mode(inputLayers[p], layer_blendmode);
           gimp_layer_set_opacity(inputLayers[p], layer_opacity);
           if (!is_selection) {
             gimp_layer_set_offsets(inputLayers[p], layer_posx, layer_posy);
           } else {
-#if !GIMP_CHECK_VERSION(2, 9, 0)
-            gimp_layer_translate(inputLayers[p], 0, 0);
-#else
+#if GIMP_CHECK_VERSION(2, 9, 0)
             gimp_item_transform_translate(_GIMP_ITEM(inputLayers[p]), 0, 0);
+#else
+            gimp_layer_translate(inputLayers[p], 0, 0);
 #endif
           }
           if (layer_name) {
@@ -868,7 +856,15 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           }
           gimp_image_insert_layer(gmic_qt_gimp_image_id, layer_id, _GIMP_NULL_LAYER, layer_pos + p);
 
-#if !GIMP_CHECK_VERSION(2, 9, 0)
+#if GIMP_CHECK_VERSION(2, 9, 0)
+          GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
+          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
+          (img /= 255).permute_axes("cxyz");
+          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
+          g_object_unref(buffer);
+          gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
+          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0, img.width(), img.height());
+#else
           GimpDrawable * drawable = gimp_drawable_get(layer_id);
           GimpPixelRgn region;
           gimp_pixel_rgn_init(&region, drawable, 0, 0, drawable->width, drawable->height, true, true);
@@ -878,14 +874,6 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gimp_drawable_merge_shadow(layer_id, true);
           gimp_drawable_update(layer_id, 0, 0, drawable->width, drawable->height);
           gimp_drawable_detach(drawable);
-#else
-          GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
-          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
-          (img /= 255).permute_axes("cxyz");
-          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
-          g_object_unref(buffer);
-          gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
-          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0, img.width(), img.height());
 #endif
           img.assign();
         }
@@ -951,7 +939,15 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           }
           gimp_image_insert_layer(gmic_qt_gimp_image_id, layer_id, _GIMP_NULL_LAYER, p);
 
-#if !GIMP_CHECK_VERSION(2, 9, 0)
+#if GIMP_CHECK_VERSION(2, 9, 0)
+          GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
+          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
+          (img /= 255).permute_axes("cxyz");
+          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
+          g_object_unref(buffer);
+          gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
+          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0, img.width(), img.height());
+#else
           GimpDrawable * drawable = gimp_drawable_get(layer_id);
           GimpPixelRgn region;
           gimp_pixel_rgn_init(&region, drawable, 0, 0, drawable->width, drawable->height, true, true);
@@ -961,14 +957,6 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gimp_drawable_merge_shadow(layer_id, true);
           gimp_drawable_update(layer_id, 0, 0, drawable->width, drawable->height);
           gimp_drawable_detach(drawable);
-#else
-          GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
-          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
-          (img /= 255).permute_axes("cxyz");
-          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
-          g_object_unref(buffer);
-          gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
-          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0, img.width(), img.height());
 #endif
           img.assign();
         }
@@ -1013,10 +1001,10 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
     const unsigned int max_width = (unsigned int)bottom_right.x;
     const unsigned int max_height = (unsigned int)bottom_right.y;
     if (_GIMP_LAYER_IS_NOT_NULL(active_layer_id)) {
-#if !GIMP_CHECK_VERSION(2, 9, 0)
-      _GimpImagePtr nimage_id = gimp_image_new(max_width, max_height, max_spectrum <= 2 ? GIMP_GRAY : GIMP_RGB);
-#else
+#if GIMP_CHECK_VERSION(2, 9, 0)
       _GimpImagePtr nimage_id = gimp_image_new_with_precision(max_width, max_height, max_spectrum <= 2 ? GIMP_GRAY : GIMP_RGB, gimp_image_get_precision(gmic_qt_gimp_image_id));
+#else
+      _GimpImagePtr nimage_id = gimp_image_new(max_width, max_height, max_spectrum <= 2 ? GIMP_GRAY : GIMP_RGB);
 #endif
       gimp_image_undo_group_start(nimage_id);
       for (unsigned int p = 0; p < images.size(); ++p) {
@@ -1048,7 +1036,15 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           }
           gimp_image_insert_layer(nimage_id, layer_id, _GIMP_NULL_LAYER, p);
 
-#if !GIMP_CHECK_VERSION(2, 9, 0)
+#if GIMP_CHECK_VERSION(2, 9, 0)
+          GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
+          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
+          (img /= 255).permute_axes("cxyz");
+          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
+          g_object_unref(buffer);
+          gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
+          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0, img.width(), img.height());
+#else
           GimpDrawable * drawable = gimp_drawable_get(layer_id);
           GimpPixelRgn region;
           gimp_pixel_rgn_init(&region, drawable, 0, 0, drawable->width, drawable->height, true, true);
@@ -1058,14 +1054,6 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gimp_drawable_merge_shadow(layer_id, true);
           gimp_drawable_update(layer_id, 0, 0, drawable->width, drawable->height);
           gimp_drawable_detach(drawable);
-#else
-          GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
-          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
-          (img /= 255).permute_axes("cxyz");
-          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
-          g_object_unref(buffer);
-          gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
-          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0, img.width(), img.height());
 #endif
           img.assign();
         }
@@ -1221,11 +1209,7 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
     break;
   case GIMP_RUN_NONINTERACTIVE:
     gmic_qt_gimp_image_id = image;
-#if !GIMP_CHECK_VERSION(2, 99, 19)
-    pluginParameters.command = g_value_get_string(gimp_value_array_index(args, 2));
-    pluginParameters.inputMode = static_cast<GmicQt::InputMode>(g_value_get_int(gimp_value_array_index(args, 0)) + (int)GmicQt::InputMode::NoInput);
-    pluginParameters.outputMode = static_cast<GmicQt::OutputMode>(g_value_get_int(gimp_value_array_index(args, 1)) + (int)GmicQt::OutputMode::InPlace);
-#else
+#if GIMP_CHECK_VERSION(2, 99, 19)
     char *command;
     int inputMode;
     int outputMode;
@@ -1238,6 +1222,10 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
     pluginParameters.inputMode = (GmicQt::InputMode)inputMode;
     pluginParameters.outputMode = (GmicQt::OutputMode)outputMode;
     g_free(command);
+#else
+    pluginParameters.command = g_value_get_string(gimp_value_array_index(args, 2));
+    pluginParameters.inputMode = static_cast<GmicQt::InputMode>(g_value_get_int(gimp_value_array_index(args, 0)) + (int)GmicQt::InputMode::NoInput);
+    pluginParameters.outputMode = static_cast<GmicQt::OutputMode>(g_value_get_int(gimp_value_array_index(args, 1)) + (int)GmicQt::OutputMode::InPlace);
 #endif
     GmicQt::run(GmicQt::UserInterfaceMode::Silent, //
                 pluginParameters,                  //
