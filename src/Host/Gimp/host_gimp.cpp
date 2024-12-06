@@ -114,6 +114,9 @@ GType gmic_qt_get_type(void) G_GNUC_CONST;
 static GList * gmic_qt_query(GimpPlugIn * plug_in);
 static GimpProcedure * gmic_qt_create_procedure(GimpPlugIn * plug_in, const gchar * name);
 
+#if GIMP_CHECK_VERSION(3, 0, 0)
+static GimpValueArray * gmic_qt_run (GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data);
+#else
 #if !GIMP_CHECK_VERSION(2, 99, 6)
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable * drawable, const GimpValueArray * args, gpointer run_data);
 #else
@@ -121,6 +124,7 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, const GimpValueArray * args, gpointer run_data);
 #else
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, GimpProcedureConfig *config, gpointer run_data);
+#endif
 #endif
 #endif
 
@@ -344,6 +348,67 @@ void get_output_layer_props(const char * const s, GimpLayerModeEffects & blendmo
   }
 }
 
+#if GIMP_CHECK_VERSION(3, 0, 0)
+_GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
+{
+  // samj ajout pour version G'MIC 3.4.3 et GIMP 3.0.0-RC1
+  GimpLayer **Calques;
+  gint Nb_Calques = 0;
+  GimpItem **CalquesChildren;
+  gint Nb_Calques_Children = 0;
+
+  Calques = gimp_image_get_layers (imageId);
+  Nb_Calques = (gimp_core_object_array_get_length ((GObject **) Calques));  // UTILISÉ
+
+  // FIN samj ajout pour version G'MIC 3.4.3 et GIMP 3.0.0-RC1
+
+  static std::vector<_GimpLayerPtr> layersId;
+  std::stack<_GimpLayerPtr> idStack;
+
+  _GimpLayerPtr * layers = gimp_image_get_layers(imageId);
+
+  // samj Modification variable Nb_Calques pour version G'MIC 3.4.3 et GIMP 3.0.0-RC1
+  for (int i = Nb_Calques - 1; i >= 0; --i) {
+
+    idStack.push(layers[i]);
+  }
+
+  layersId.clear();
+
+  int childCount = 0;
+  while (!idStack.empty()) {
+
+	// samj modification
+    Nb_Calques_Children = 0;
+    childCount = 0;
+
+    if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
+      CalquesChildren = gimp_item_get_children (GIMP_ITEM (idStack.top()));
+      for (int i = 0; _GIMP_LAYER(CalquesChildren[i]) != NULL; i++) {
+        Nb_Calques_Children++ ;
+      }
+      g_free (CalquesChildren);
+    }
+	childCount = Nb_Calques_Children;
+	// samj FIN modification
+
+    if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
+      _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()));
+      idStack.pop();
+      for (int i = childCount - 1; i >= 0; --i) {
+        idStack.push(_GIMP_LAYER(children[i])); // TODO: Check if layers can have non-layer children.
+      }
+    } else {
+      layersId.push_back(idStack.top());
+      idStack.pop();
+    }
+  }
+  *count = layersId.size();
+  return layersId.data();
+}
+
+#else
+
 _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
 {
   static std::vector<_GimpLayerPtr> layersId;
@@ -372,6 +437,8 @@ _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
   *count = layersId.size();
   return layersId.data();
 }
+
+#endif
 
 template <typename T> void image2uchar(gmic_library::gmic_image<T> & img)
 {
@@ -967,7 +1034,12 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
         if (Mw && Mh) {
           gimp_image_resize(gmic_qt_gimp_image_id, Mw, Mh, -top_left.x, -top_left.y);
         }
-#if GIMP_CHECK_VERSION(2, 99, 12)
+
+#if GIMP_CHECK_VERSION(3, 0, 0)
+
+        // Do nothing here.
+
+#elif GIMP_CHECK_VERSION(2, 99, 12)
         GimpLayer * selected_layer;
         if (outputMode == GmicQt::OutputMode::NewLayers) {
           selected_layer = active_layer_id;
@@ -1067,7 +1139,13 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
 /*
  * 'Run' function, required by the GIMP plug-in API.
  */
+
+#if GIMP_CHECK_VERSION(3, 0, 0)
+static GimpValueArray *
+gmic_qt_run (GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data)
+#else
 void gmic_qt_run(const gchar * /* name */, gint /* nparams */, const GimpParam * param, gint * nreturn_vals, GimpParam ** return_vals)
+#endif
 {
 #if GIMP_CHECK_VERSION(2, 9, 0)
   gegl_init(nullptr, nullptr);
@@ -1160,6 +1238,10 @@ static GList * gmic_qt_query(GimpPlugIn * plug_in)
 /*
  * 'Run' function, required by the GIMP plug-in API.
  */
+
+#if GIMP_CHECK_VERSION(3, 0, 0)
+static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data)
+#else
 #if !GIMP_CHECK_VERSION(2, 99, 7)
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable * drawable, const GimpValueArray * args, gpointer run_data)
 #else
@@ -1167,6 +1249,7 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, const GimpValueArray * args, gpointer run_data)
 #else
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, GimpProcedureConfig *config, gpointer run_data)
+#endif
 #endif
 #endif
 {
@@ -1218,6 +1301,11 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
                 &accepted);
     break;
   }
+
+#if GIMP_CHECK_VERSION(3, 0, 0)
+  gegl_exit();
+#endif
+
   return gimp_procedure_new_return_values(procedure, accepted ? GIMP_PDB_SUCCESS : GIMP_PDB_CANCEL, NULL);
 }
 
