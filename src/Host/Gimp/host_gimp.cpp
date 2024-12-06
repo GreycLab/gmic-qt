@@ -1074,8 +1074,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
  */
 
 #if GIMP_CHECK_VERSION(3, 0, 0)
-static GimpValueArray *
-gmic_qt_run (GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data)
+static GimpValueArray *gmic_qt_run (GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data)
 #else
 void gmic_qt_run(const gchar * /* name */, gint /* nparams */, const GimpParam * param, gint * nreturn_vals, GimpParam ** return_vals)
 #endif
