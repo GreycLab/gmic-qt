@@ -40,11 +40,6 @@
 #include "ImageTools.h"
 #include "gmic.h"
 
-/*
- * Part of this code is much inspired by the original source code
- * of the GTK version of the gmic plug-in for GIMP by David Tschumperl\'e.
- */
-
 #define _gimp_image_get_item_position gimp_image_get_item_position
 
 #if !GIMP_CHECK_VERSION(2, 7, 15)
@@ -115,10 +110,10 @@ static GList * gmic_qt_query(GimpPlugIn * plug_in);
 static GimpProcedure * gmic_qt_create_procedure(GimpPlugIn * plug_in, const gchar * name);
 
 #if GIMP_CHECK_VERSION(3, 0, 0)
-static GimpValueArray * gmic_qt_run (GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data);
+static GimpValueArray * gmic_qt_run(GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data);
 #else
 #if !GIMP_CHECK_VERSION(2, 99, 6)
-static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable * drawable, const GimpValueArray * args, gpointer run_data);
+static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable * drawables, const GimpValueArray * args, gpointer run_data);
 #else
 #if !GIMP_CHECK_VERSION(2, 99, 19)
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, const GimpValueArray * args, gpointer run_data);
@@ -354,9 +349,8 @@ _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
   std::stack<_GimpLayerPtr> idStack;
 
 #if GIMP_CHECK_VERSION(3, 0, 0)
-  GimpLayer ** layersList = gimp_image_get_layers(imageId);
-  int layersCount = gimp_core_object_array_get_length((GObject **)layersList);
   _GimpLayerPtr * layers = gimp_image_get_layers(imageId);
+  int layersCount = gimp_core_object_array_get_length((GObject **)layers);
 #else
   int layersCount = 0;
   _GimpLayerPtr * layers = gimp_image_get_layers(imageId, &layersCount);
@@ -369,20 +363,12 @@ _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
 
   while (!idStack.empty()) {
     int childCount = 0;
-#if GIMP_CHECK_VERSION(3, 0, 0)
     if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
-      GimpItem **childLayers = gimp_item_get_children(GIMP_ITEM(idStack.top()));
-      for (int i = 0; _GIMP_LAYER(childLayers[i]) != NULL; ++i) {
-        ++childCount;
-      }
-      g_free(childLayers);
-    }
-#endif
-
-    if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
-
 #if GIMP_CHECK_VERSION(3, 0, 0)
       _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()));
+      for (int i = 0; _GIMP_LAYER(children[i]) != NULL; ++i) {
+        ++childCount;
+      }
 #else
       _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()), &childCount);
 #endif
