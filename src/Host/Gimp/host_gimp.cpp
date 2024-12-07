@@ -1072,12 +1072,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
 /*
  * 'Run' function, required by the GIMP plug-in API.
  */
-
-#if GIMP_CHECK_VERSION(3, 0, 0)
-static GimpValueArray *gmic_qt_run (GimpProcedure *procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data)
-#else
 void gmic_qt_run(const gchar * /* name */, gint /* nparams */, const GimpParam * param, gint * nreturn_vals, GimpParam ** return_vals)
-#endif
 {
 #if GIMP_CHECK_VERSION(2, 9, 0)
   gegl_init(nullptr, nullptr);
@@ -1174,15 +1169,7 @@ static GList * gmic_qt_query(GimpPlugIn * plug_in)
 #if GIMP_CHECK_VERSION(3, 0, 0)
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable ** drawables, GimpProcedureConfig * config, gpointer run_data)
 #else
-#if !GIMP_CHECK_VERSION(2, 99, 7)
-static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, GimpDrawable * drawable, const GimpValueArray * args, gpointer run_data)
-#else
-#if !GIMP_CHECK_VERSION(2, 99, 19)
-static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, const GimpValueArray * args, gpointer run_data)
-#else
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, GimpProcedureConfig *config, gpointer run_data)
-#endif
-#endif
 #endif
 {
   gegl_init(NULL, NULL);
@@ -1208,7 +1195,6 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
     break;
   case GIMP_RUN_NONINTERACTIVE:
     gmic_qt_gimp_image_id = image;
-#if GIMP_CHECK_VERSION(2, 99, 19)
     char *command;
     int inputMode;
     int outputMode;
@@ -1221,11 +1207,6 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
     pluginParameters.inputMode = (GmicQt::InputMode)inputMode;
     pluginParameters.outputMode = (GmicQt::OutputMode)outputMode;
     g_free(command);
-#else
-    pluginParameters.command = g_value_get_string(gimp_value_array_index(args, 2));
-    pluginParameters.inputMode = static_cast<GmicQt::InputMode>(g_value_get_int(gimp_value_array_index(args, 0)) + (int)GmicQt::InputMode::NoInput);
-    pluginParameters.outputMode = static_cast<GmicQt::OutputMode>(g_value_get_int(gimp_value_array_index(args, 1)) + (int)GmicQt::OutputMode::InPlace);
-#endif
     GmicQt::run(GmicQt::UserInterfaceMode::Silent, //
                 pluginParameters,                  //
                 std::list<GmicQt::InputMode>(),    //
@@ -1233,11 +1214,7 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
                 &accepted);
     break;
   }
-
-#if GIMP_CHECK_VERSION(3, 0, 0)
   gegl_exit();
-#endif
-
   return gimp_procedure_new_return_values(procedure, accepted ? GIMP_PDB_SUCCESS : GIMP_PDB_CANCEL, NULL);
 }
 
@@ -1260,12 +1237,12 @@ static GimpProcedure * gmic_qt_create_procedure(GimpPlugIn * plug_in, const gcha
                                      blurb.constData(), // blurb
                                      blurb.constData(), // help
                                      name);             // help_id
+
     gimp_procedure_set_attribution(procedure,
                                    "S\303\251bastien Fourey", // author
                                    "S\303\251bastien Fourey", // copyright
                                    "2017");                   // date
 
-#if GIMP_CHECK_VERSION(2, 99, 19)
    gimp_procedure_add_int_argument(procedure,
 				   "input",                                                                                                                                     // name
 				   "input",                                                                                                                                     // nick
@@ -1290,32 +1267,6 @@ static GimpProcedure * gmic_qt_create_procedure(GimpPlugIn * plug_in, const gcha
 				       "G'MIC command string, when non-interactive", // blurb
 				       "",                                           // default
 				       G_PARAM_READWRITE);                           // flags
-#else
-    GIMP_PROC_ARG_INT(procedure,
-                      "input",                                                                                                                                     // name
-                      "input",                                                                                                                                     // nick
-                      "Input layers mode, when non-interactive (0=none, 1=active, 2=all, 3=active and below, 4=active and above, 5=all visible, 6=all invisible)", // blurb
-                      0,                                                                                                                                           // min
-                      6,                                                                                                                                           // max
-                      0,                                                                                                                                           // default
-                      G_PARAM_READWRITE);                                                                                                                          // flags
-
-    GIMP_PROC_ARG_INT(procedure,
-                      "output",                                                                                      // name
-                      "output",                                                                                      // nick
-                      "Output mode, when non-interactive (0=in place,1=new layers,2=new active layers,3=new image)", // blurb
-                      0,                                                                                             // min
-                      3,                                                                                             // max
-                      0,                                                                                             // default
-                      G_PARAM_READWRITE);                                                                            // flags
-
-    GIMP_PROC_ARG_STRING(procedure,
-                         "command",                                    // name
-                         "command",                                    // nick
-                         "G'MIC command string, when non-interactive", // blurb
-                         "",                                           // default
-                         G_PARAM_READWRITE);                           // flags
-#endif
   }
 
   return procedure;
