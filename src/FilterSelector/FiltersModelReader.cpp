@@ -42,13 +42,13 @@
 
 namespace
 {
-const QChar CHAR_OPENING_PARENTHESIS('(');
+// const QChar CHAR_OPENING_PARENTHESIS('(');
 const QChar CHAR_CLOSING_PARENTHESIS(')');
 const QChar CHAR_SPACE(' ');
 const QChar CHAR_TAB('\t');
 const QChar CHAR_COLON(':');
 const QChar CHAR_UNDERSCORE('_');
-const QChar CHAR_CROSS_SIGN('#');
+// const QChar CHAR_CROSS_SIGN('#');
 const QChar CHAR_NEWLINE('\n');
 const QString AT_GUI("#@gui");
 
