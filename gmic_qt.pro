@@ -171,7 +171,7 @@ LIBS += -lfftw3_threads
 win32 {
   DEFINES += _IS_WINDOWS_
   DEFINES += cimg_display=2
-  LIBS += -mwindows -lpthread -DPSAPI_VERSION=1 -lpsapi -lgdi32
+  LIBS += -mwindows -lpthread -DPSAPI_VERSION=1 -lpsapi -lgdi32 -Wl,--stack,16777216
   message( Windows/GDI32 platform )
 }
 
