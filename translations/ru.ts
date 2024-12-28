@@ -250,7 +250,7 @@
         <location filename="../src/FilterParameters/FileParameter.cpp" line="162"/>
         <location filename="../src/FilterParameters/FileParameter.cpp" line="165"/>
         <source>Select a file</source>
-        <translation>Выбрать файл</translation>
+        <translation>Выбрите файл</translation>
     </message>
 </context>
 <context>
@@ -259,7 +259,7 @@
         <location filename="../src/FilterParameters/FilterParametersWidget.cpp" line="44"/>
         <location filename="../src/FilterParameters/FilterParametersWidget.cpp" line="273"/>
         <source>&lt;i&gt;Select a filter&lt;/i&gt;</source>
-        <translation>&lt;i&gt;Выбрать фильтр&lt;/i&gt;</translation>
+        <translation>&lt;i&gt;Выбрите фильтр&lt;/i&gt;</translation>
     </message>
     <message>
         <location filename="../src/FilterParameters/FilterParametersWidget.cpp" line="240"/>
@@ -355,7 +355,7 @@
     <message>
         <location filename="../src/FilterParameters/FolderParameter.cpp" line="138"/>
         <source>Select a folder</source>
-        <translation>Выбрать папку</translation>
+        <translation>Выбрите папку</translation>
     </message>
 </context>
 <context>
