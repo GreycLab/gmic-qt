@@ -5,6 +5,7 @@ Name=G'MIC-Qt
 Terminal=false
 Comment=Apply G'MIC filters to images
 Comment[fr]=Appliquer des filtres G'MIC à des images
+Comment[ru]=Применяйте фильтры G'MIC к изображениям
 TryExec=gmic_qt
 Exec=gmic_qt %F
 Icon=gmic_qt

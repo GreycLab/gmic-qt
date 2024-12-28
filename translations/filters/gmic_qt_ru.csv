@@ -1,30 +1,29 @@
 <b>Arrays & Tiles</b> , <b>Массивы и плитки</b>
 <b>Artistic</b> , <b>Художественный</b>
-<b>Black & White</b> , <b>Чёрное и белое</b>
+<b>Black & White</b> , <b>Чёрно-белое</b>
 <b>Colors</b> , <b>Цвета</b>
 <b>Contours</b> , <b>Контуры</b>
 <b>Deformations</b> , <b>Деформации</b>
 <b>Degradations</b> , <b>Деградации</b>
 <b>Details</b> , <b>Подробности</b>
 <b>Testing</b> , <b>Тестирование</b>
-<b>Frames</b> , <b>Фреймы</b>
+<b>Frames</b> , <b>Рамки</b>
 <b>Frequencies</b> , <b>Частоты</b>
 <b>Layers</b> , <b>Слои</b>
 <b>Lights & Shadows</b> , <b>Свет и тени</b>
 <b>Patterns</b> , <b>Шаблоны</b>
-<b>Rendering</b> , <b>Оказание услуг</b>
-<b>Repair</b> , <b>Ремонт</b>
+<b>Rendering</b> , <b>Рендеринг</b>
+<b>Repair</b> , <b>Восстановление</b>
 <b>Sequences</b> , <b>Последовательности</b>
 <b>Silhouettes</b> , <b>Силуэты</b>
 <b>Icons</b> , <b>Иконки</b>
-<b>Misc</b> , <b>Ошибка</b>
+<b>Misc</b> , <b>Разное</b>
 <b>Nature</b> , <b>Природа</b>
 <b>Others</b> , <b>Другие</b>
 <b>Stereoscopic 3D</b> , <b>Стереоскопическое 3D</b>
-&#9829; Support Us ! &#9829; , ♥ Поддержите нас! ♥
 *Colors Doping , *Цветной допинг
 *Colors Doping* , *Цветной допинг*
-*Comix Colors* , *Комикс Цветов*
+*Comix Colors* , *Смешанные цвета*
 *Dark Edges* , *Тёмные края*
 *Dark Screen* , *Тёмный экран*
 *Graphix Colors , *Графиксные цвета
@@ -33,67 +32,67 @@
 +180 Deg. , +180 градусов
 +90 Deg. , +90 градусов
 - NO - , - НЕТ -
--1. Value Action , -1. Ценностное действие
--2. Overall Channel(s) , -2. Общий канал (ы)
--3. Normalisation Channel(s) , -3. Канал(ы) нормализации
--4. Normalise , -4. Нормализуют
+-1. Value Action , -1. Величина действия
+-2. Overall Channel(s) , -2. Общий канал(ы)
+-3. Normalisation Channel(s) , -3. Нормализация канала(ов)
+-4. Normalise , -4. Нормализовать
 -90 Deg. , -90 градусов
-.Png , Пнг
+.Png ,
 0 Deg. , 0 градусов
-0.  Recompute , 0. Вычислить
+0.  Recompute , 0. пересчитать
 1 Levels , 1 Уровни
-1.  Plasma Texture [Discards Input Image] , 1. Плазменная текстура [Отбрасывает входное изображение].
+1.  Plasma Texture [Discards Input Image] , 1. Плазменная текстура [удаляет входное изображение].
 10.  Quadtree Max Precision , 10. Квадтри Макс Точность
-10th , десятый
-10th Color , 10-ый цвет
-11.  Quadtree Min Homogeneity , 11. Квадтри Мин Гомогенность
+10th , 10-й
+10th Color , 10-й цвет
+11.  Quadtree Min Homogeneity , 11. Четырёхугольная мин однородность
 11th , 11-й
-12 Colors , 12 Цветов
-12 Grays , 12 серый
-12.  Quadtree Max Homogeneity , 12. Квадтри Макс Однородность
+12 Colors , 12 Цвета
+12 Grays , 12 Серые
+12.  Quadtree Max Homogeneity , 12. Четырёхугольная макс однородность
 125 Keypoints , 125 Ключевые точки
-12th , 12-ый
+12th , 12-й
 13. Noise Type , 13. Тип шума
 13th , 13-й
 14. Minimum Noise , 14. Минимальный шум
-14th , 14-я
+14th , 14-й
 15. Maximum Noise , 15. Максимальный шум
-15th , 15-ый
-16 Colors , 16 Цветов
-16 Grays , 16 Серый
-16. Noise Channel(s) , 16. Шумовой канал (ы)
-16th , 16-ый
+15th , 15-й
+16 Colors , 16 Цвета
+16 Grays , 16 Серые
+16. Noise Channel(s) , 16. Шумовой канал(ы)
+16th , 16-й
 17. Warp Iterations , 17. Итерации деформации
 18. Warp Intensity , 18. Интенсивность искривления
 180 Deg. , 180 градусов
 19. Warp Offset , 19. Смещение по деформации
-1st , 1-ый
+1st , 1-й
 1st Additional Palette (.Gpl) , 1-я дополнительная палитра (.Gpl)
 1st Color , 1-й цвет
 1st Parameter , 1-й параметр
 1st Text , 1-й Текст
 1st Tone , 1-й Тон
-1st Variance , 1-я Вариант
+1st Variance , 1-й Вариант
 1st X-Coord , 1-й шнур X-Coord
 1st Y-Coord , 1-й Y-корд
-2 Colors , 2 цвета
-2 Grays , 2 серые
+2 Colors , 2 Цвета
+2 Grays , 2 Серые
 2 Noise , 2 Шум
-2-Strip Process , 2-полосный процесс
+2-Strip Process , 2-Штриховочный процесс
 2.  Plasma Scale , 2. Шкала плазмы
-20. Scale to Width , 20. Шкала до ширины
-21. Scale to Height , 21. Масштаб до высоты
+20. Scale to Width , 20. Шкала  ширины
+21. Scale to Height , 21. Шкала высоты
 216 Keypoints , 216 Ключевые точки
 22. Correlated Channels , 22. Корреспондентские каналы
-22.5 Deg. , 22,5 градуса
+22.5 Deg. ,22.5 Град.
 23. Boundary , 23. Граница
 24. Warp Channel(s) , 24. Канал(ы) деформации
 25. Random Negation , 25. Случайное отрицание
 26. Random Negation Channel(s) , 26. Случайный канал(и) отрицания
 27 Keypoints , 27 Ключевые точки
 27. Gamma Offset , 27. Гамма-смещение
-270 Deg. , 270 градусов
-28. Hue Offset , 28. смещение оттенка
+270 Deg. , 270 Град.
+28. Hue Offset , 28. Смещение оттенка
 29. Normalise , 29. Нормализовать
 2nd , 2-ой
 2nd Additional Palette (.Gpl) , 2-я дополнительная палитра (.Gpl)
@@ -101,14 +100,14 @@
 2nd Parameter , 2-й параметр
 2nd Text , 2-й Текст
 2nd Tone , 2-й Тон
-2nd Variance , 2-я Вариант
+2nd Variance , 2-й Вариант
 2nd X-Coord , 2-й X-корд
 2nd Y-Coord , 2-й Y-корд
 2x Type , 2х Тип
 2XY Mirror , 2XY Зеркало
 2xy-Axes , 2xy-топоры
 3 Colors , 3 Цвета
-3 Grays , 3 серый
+3 Grays , 3 Серые
 3 Mix , 3 Смешивание
 3.  Plasma Alpha Channel , 3. Плазменный Альфа-канал
 30. Minimum Hue , 30. Минимальный оттенок
@@ -148,17 +147,17 @@
 3rd Tone , 3-й Тон
 3rd X-Coord , 3-й X-корд
 3rd Y-Coord , 3-й Y-корд
-4 Colors , 4 цвета
-4 Grays , 4 серые
+4 Colors , 4 Цвета
+4 Grays , 4 Серые
 4.  Segmentation [No Alpha Channel] , 4. Сегментация [No Alpha Channel]
 4096x4096 Layer , 4096x4096 Слой
 45 Deg. , 45 градусов
-4th , 4-ый
+4th , 4-й
 4th Color , 4-й цвет
 4th Tone , 4-й Тон
-5.  Edge Threshold , 5. Порог Кромки
+5.  Edge Threshold , 5. Порог кромки
 512x512 Layer , 512x512 Слой
-5th , 5-ый
+5th , 5-й
 5th Color , 5-й цвет
 5th Tone , 5-й Тон
 6.  Smoothness , 6. Гладкость
@@ -166,94 +165,94 @@
 60's (faded) , 60-е годы (потускнело)
 64 (Faster) , 64 (Быстрее)
 64 Keypoints , 64 Ключевые точки
-67.5 Deg. , 67,5 градусов
+67.5 Deg. ,67.5 градусов
 6th , шестой
 6th Color , 6-й цвет
 6th Tone , 6-й Тон
 7.  Blur , 7. Пятно
-7th , 7-я
+7th , 7-й
 7th Color , 7-й цвет
 7th Tone , 7-й тон
-8 Colors , 8 Цветов
-8 Grays , 8 серый
+8 Colors , 8 Цвета
+8 Grays , 8 Серые
 8 Keypoints (RGB Corners) , 8 Ключевые точки (углы RGB)
 8.  Quadtree Pixelisation [No Alpha Channel] , 8. Квадтри пикселизации [Нет альфа-канала]
-8th , 8-я
+8th , 8-й
 8th Color , 8-й цвет
 8th Tone , 8-й тон
-9.  Quadtree Min Precision , 9. Квадтри Мин Точность
+9.  Quadtree Min Precision , 9. Квадтри мин точность
 90 Deg. , 90 градусов.
-9th , 9-ый
+9th , 9-й
 9th Color , 9-й цвет
 [Cyan]MYK , МИК
 A Lot of Cyan , Много сине-зелёного
 A Lot of Key , Много ключей
 A Lot of Magenta , Много пурпурного
 A Lot of Yellow , Много желтого
-A-Color Factor , А-Цветовой фактор
-A-Color Shift , сдвиг цвета
-A-Color Smoothness , Гладкость цвета
+A-Color Factor , А-цветовой фактор
+A-Color Shift , Сдвиг А-цвета
+A-Color Smoothness , Гладкость А-цвета
 A4 / 100 PPI (Recommended) , A4 / 100 PPI (Рекомендуется)
 Abigail Gonzalez (21) , Абигайль Гонсалес (21)
 About G'MIC , О G'MIC
-Absolute Brightness , Абсолютная Яркость
-Absolute Value , Абсолютная стоимость
+Absolute Brightness , Абсолютная яркость
+Absolute Value , Абсолютный объём
 Abstraction , Абстракция
 Acceleration , Ускорение
 Achromatomaly , Ахроматомалия
 Achromatopsia , Ахроматопсия
 Acros , Акрос
-Acros+G , Акрос+Г
-Acros+Ye , Акрос+Да
+Acros+G , Акрос+G
+Acros+Ye , Акрос+Ye
 Action , Действие
-Action #1 , Действие № 1
-Action #10 , Действие № 10
-Action #11 , Действие № 11
-Action #12 , Действие № 12
-Action #13 , Действие № 13
-Action #14 , Действие № 14
-Action #15 , Действие № 15
-Action #16 , Действие № 16
-Action #17 , Действие № 17
-Action #18 , Действие № 18
-Action #19 , Действие № 19
-Action #2 , Действие № 2
-Action #20 , Действие № 20
-Action #21 , Действие № 21
+Action #1 , Действие №1
+Action #10 , Действие №10
+Action #11 , Действие №11
+Action #12 , Действие №12
+Action #13 , Действие №13
+Action #14 , Действие №14
+Action #15 , Действие №15
+Action #16 , Действие №16
+Action #17 , Действие №17
+Action #18 , Действие №18
+Action #19 , Действие №19
+Action #2 , Действие №2
+Action #20 , Действие №20
+Action #21 , Действие №21
 Action #22 , Действие #22
-Action #23 , Действие № 23
-Action #24 , Действие № 24
-Action #3 , Действие № 3
-Action #4 , Действие № 4
-Action #5 , Действие № 5
-Action #6 , Действие № 6
-Action #7 , Действие № 7
-Action #8 , Действие № 8
-Action #9 , Действие № 9
-Action Magenta 01 , Акция "Маджента 01
+Action #23 , Действие №23
+Action #24 , Действие №24
+Action #3 , Действие №3
+Action #4 , Действие №4
+Action #5 , Действие №5
+Action #6 , Действие №6
+Action #7 , Действие №7
+Action #8 , Действие №8
+Action #9 , Действие №9
+Action Magenta 01 , Акция Пурпурный 01
 Action Red 01 , Действие Красный 01
-Activate 'Pencil Smoother' , Активируйте "Карандаш Гладче".
+Activate 'Pencil Smoother' , Активируйте Карандаш сглаживания
 Activate Color Enhancement , Активировать улучшение цвета
-Activate Colors Geometric Shapes , Активировать цвета Геометрические формы
+Activate Colors Geometric Shapes , Активировать цвета геометрических форм
 Activate Custom Filter , Активировать пользовательский фильтр
 Activate Lizards , Активировать ящериц
 Activate Mirror , Активировать зеркало
 Activate Pink Elephants , Активировать розовых слонов
 Activate Second Direction , Активировать второе направление
 Activate Shakes , Активировать коктейли
-Activate Slice 1 , Активировать ломтик 1
-Activate Slice 2 , Активировать ломтик 2
-Activate Slice 3 , Активировать ломтик 3
-Activate Slice 4 , Активировать ломтик 4
+Activate Slice 1 , Активировать Срез 1
+Activate Slice 2 , Активировать Срез 2
+Activate Slice 3 , Активировать Срез 3
+Activate Slice 4 , Активировать Срез 4
 Activer Symmetrizoscope , Активерный симметризоскоп
 Adaptive , Адаптивный сайт
 Add , Добавить
-Add 1px Outline , Добавить 1px Очертание
+Add 1px Outline , Добавить 1пикс контур
 Add Alpha Channels to Detail Scale Layers , Добавить альфа-каналы в слои деталей шкалы
 Add as a New Layer , Добавить как новый слой
-Add Chalk Highlights , Добавить мелом Основные моменты
+Add Chalk Highlights , Добавить меловые блики
 Add Color Background , Добавить цветной фон
-Add Comment Area in HTML Page , Добавить область комментариев в HTML Page
+Add Comment Area in HTML Page , Добавить область комментариев в HTML
 Add Grain , Добавить зерно
 Add Image Label , Добавить ярлык изображения
 Add Painter's Touch , Добавить прикосновение художника
@@ -264,7 +263,7 @@ Additive , Добавочный сайт
 Adjust Background Reconstruction , Настроить фоновую реконструкцию
 Adventure 1453 , Приключение 1453
 Agfa Vista 200 , Агфа-Виста 200
-Aggressive Highlights Recovery 5 , Агрессивные моменты Восстановление 5
+Aggressive Highlights Recovery 5 , Агрессивное восстановление бликов
 Alex Jordan (81) , Алекс Джордан (81)
 Algorithm , Алгоритм
 Aliasing , Псевдоожижение
@@ -274,10 +273,10 @@ Align Layers , Выравнивающие слои
 Aligned , Подписанный
 Alignment Type , Тип выравнивания
 All , Все
-All 45° Rotations , Все 45° Вращения
-All 90° Rotations , Все 90&деградусов; Вращения
+All 45° Rotations , Все повернуть на 45°
+All 90° Rotations , Все повернуть на 90°
 All [Collage] , Все [Коллаж]
-All but Reference Color , Все, кроме эталонного цвета
+All but Reference Color , Все кроме эталонного цвета
 All Layers and Masks , Все слои и маски
 All Tones , Все тона
 All XY-Flips , Все XY-флипы
@@ -296,12 +295,12 @@ Amplitude (%) , Амплитуда (%)
 Amplitude / Angle , Амплитуда / Угол
 Amstragram , Амстраграмма
 Amstragram+ , Амстраграмма+
-Anaglypgh Green/magenta Optimized , Анаглипг Зеленый/магента Оптимизировано
+Anaglypgh Green/magenta Optimized , Анаглиф Зеленый/пурпурный Оптимизировано
 Anaglyph Blue/yellow , Анаглиф Голубой/желтый
 Anaglyph Blue/yellow Optimized , Анаглиф Голубой/желтый Оптимизированный
 Anaglyph Glasses Adjustment , Регулировка анаглифных стекол
-Anaglyph Green/magenta , Анаглиф Грин/Магента
-Anaglyph Green/magenta Optimized , Анаглиф Зеленый/магента Оптимизированный
+Anaglyph Green/magenta , Анаглиф Грин/пурпурный
+Anaglyph Green/magenta Optimized , Анаглиф Зеленый/пурпурный Оптимизированный
 Anaglyph Reconstruction , Реконструкция анаглифов
 Anaglyph Red/cyan , Анаглиф Красный/голубой
 Anaglyph Red/cyan Optimized , Анаглиф Красный/голубой Оптимизированный
@@ -335,11 +334,11 @@ Anime , Аниме
 Anisotropic , Анизотропный
 Anisotropy , Анизотропия
 Annular Steiner Chain Round Tiles , Круглые плитки с кольцевой цепью Штейнера
-Anti Alias , Анти-альянс
+Anti Alias , Сгладить
 Antialiasing , Сглаживание
 Antisymmetry , Антисимметрия
 Any , Любой
-Apocalypse This Very Moment , Апокалипсис - это очень мгновенный момент.
+Apocalypse This Very Moment , Апокалипсис в этот момент
 Apply Adjustments On , Применить настройки Вкл
 Apply Color Balance , Применить цветовой баланс
 Apply External CLUT , Применить внешнее замыкание
@@ -347,10 +346,10 @@ Apply Mask , Применить Маску
 Apply Skin Tone Mask , Применить маску тона кожи
 Apply Transformation From , Применить преобразование от
 Arabica 12 , Арабика 12
-Area , Территория
-Area Smoothness , Площадь Гладкость
+Area , Область
+Area Smoothness , Область сглаживание
 Areas Light Adjustment , Области Регулировка освещения
-Areas Smoothness , Области Гладкость
+Areas Smoothness , Области сглаживания
 Array [Faded] , Массив [Выцветший]
 Array [Mirrored] , Массив [Зеркало]
 Array [Random Colors] , Массив [Случайные цвета]
@@ -359,13 +358,13 @@ Array [Regular] , Массив [Обычный]
 Array Mode , Режим массива
 Arrows , Стрелки
 Arrows (Outline) , Стрелки (Outline)
-Artistic  Modern , Художественный Модерн
-Artistic Hard , Художественно сложная
-Artistic Round , Художественный раунд
+Artistic  Modern , Художественный модерн
+Artistic Hard , Художественно жёсткий
+Artistic Round , Художественный округлый
 Ascii Art , Асций Арт
 Aspect , Аспект
 Aspect Ratio , Соотношение сторон
-Asplenium Adiantum-Nigrum , аспленовый адиант-нигрум
+Asplenium Adiantum-Nigrum , Asplenium чёрная алея
 Associated Color , Соответствующий цвет
 Astia , Астия
 Attenuation , Аттенуация
@@ -374,13 +373,13 @@ Australia , Австралия
 Auto , Авто
 Auto Balance , Автоматический баланс
 Auto Crop , Автоматическая культура
-Auto Reduce Level (Level Slider Is Disabled) , Автоматическое снижение уровня (ползунок уровня отключен)
-Auto Set Hue Inverse (Hue Slider Is Disabled) , Автоматическая установка инверсии оттенка (ползунок оттенка отключен)
+Auto Reduce Level (Level Slider Is Disabled) , Автоснижение уровня (ползунок уровня отключен)
+Auto Set Hue Inverse (Hue Slider Is Disabled) , Автоустановка инверсии оттенка (ползунок оттенка отключен)
 Auto-Clean Bottom Color Layer , Автоматически чистый нижний цветной слой
-Auto-Reduce Number of Frames , Автоматическая перезагрузка Количество кадров
-Auto-Set Periodicity , Автоматическая установка периодичности
+Auto-Reduce Number of Frames , Автоперезагрузка Количество кадров
+Auto-Set Periodicity , Автоустановка периодичности
 Auto-Threshold , Автопорог
-Autocrop , Автокроп
+Autocrop , Автообрезка
 Autocrop Output Layers , Автоматические выходные слои
 Automatic , Автоматический
 Automatic & Contrast Mask , Автоматическая и контрастная маска
@@ -406,14 +405,14 @@ Axis , Ось
 Azimuth , Азимут
 Azrael 93 , Азраиль 93
 B&W , КРОВАТЬ И НОЧЬ
-B&W Pencil [Animated] , Чёрно-белый карандаш [анимированный]
+B&W Pencil [Animated] , ч/б карандаш [анимированный]
 B&W Photograph , ч/б фотография
-B&W Stencil , трафаретная печать
-B&W Stencil [Animated] , Трафарет по трафарету B&W [анимированный]
-B-Color Factor , коэффициент B-цвета
-B-Color Shift , сдвиг цвета B
-B-Color Smoothness , Гладкость цвета B
-B-Component , B-компонент
+B&W Stencil , ч/б трафарет
+B&W Stencil [Animated] , ч/б трафарет [анимированный]
+B-Color Factor , Коэффициент Син-цвета
+B-Color Shift , Сдвиг цвета Син
+B-Color Smoothness , Гладкость цвета Син
+B-Component , Син-компонент
 Background , Справочная информация
 Background Color , Цвет фона
 Background Intensity , Интенсивность фона
@@ -426,14 +425,14 @@ Balance Color , Цвет баланса
 Balance SRGB , Баланс SRGB
 Ball , Шар
 Balloons , Воздушные шары
-Balls , Шарики
+Balls , Шары
 Band Width , Ширина полосы
 Banding Denoise , Обвязка денуазы
 Bandwidth , Полоса пропускания
 Barbara , Барбара
-Barbed Wire , колючая проволока
-Barnsley Fern , папоротник Барнсли
-Bars , Бары
+Barbed Wire , Колючая проволока
+Barnsley Fern , Папоротник Барнсли
+Bars , Полосы
 Base Reference Dimension , Базовое эталонное измерение
 Base Scale , Базовая шкала
 Base Thickness (%) , Базовая толщина (%)
@@ -443,33 +442,33 @@ Bayer Filter , фильтр Байера
 Bayer Reconstruction , Реконструкция Байера
 Behind , Позади
 Below , Ниже
-Berlin Sky , берлинское небо
+Berlin Sky , Берлинское небо
 Best Match , Лучший матч
-Beta , Бета-версия
+Beta , Бета
 BG Textured , BG Текстурированный
 Bi-Directional , Двунаправленный
 Bicubic , Бикубик
-Bidirectional [Sharp] , Двунаправленный [Sharp]
+Bidirectional [Sharp] , Двунаправленный [Резкий]
 Bidirectional [Smooth] , Двунаправленный [Гладкий]
-Bidirectional Rendering , двунаправленное реендеринг
+Bidirectional Rendering , Двунаправленный рендеринг
 Bilateral , Двусторонний
-Bilateral Radius , Двустороннее Радиус
+Bilateral Radius , Двусторонний радиус
 Binary , Двоичный
-Binary Digits , двоичные цифры
-Bit Masking (End) , Битовая маскировка (в конце)
-Bit Masking (Start) , Битовая маскировка (Старт)
-Black & White , Чёрное и белое
-Black & White (25) , Чёрное и белое (25)
-Black & White-1 , Чёрно-белый-1
-Black & White-10 , Чёрное и Белое-10
-Black & White-2 , Чёрное и Белое-2
-Black & White-3 , Чёрное и белое 3
-Black & White-4 , Чёрный и белый-4
-Black & White-5 , Чёрный и белый-5
-Black & White-6 , Чёрный и белый-6
-Black & White-7 , Чёрное и Белое-7
-Black & White-8 , Чёрный и белый 8
-Black & White-9 , Чёрное и Белое-9
+Binary Digits , Двоичные цифры
+Bit Masking (End) , Битовая маскировка (конец)
+Bit Masking (Start) , Битовая маскировка (старт)
+Black & White , Чёрно-белое
+Black & White (25) , Чёрно-белое (25)
+Black & White-1 , Чёрно-белое-1
+Black & White-10 , Чёрно-белое-10
+Black & White-2 , Чёрно-белое-2
+Black & White-3 , Чёрно-белое 3
+Black & White-4 , Чёрно-белое-4
+Black & White-5 , Чёрно-белое-5
+Black & White-6 , Чёрно-белое-6
+Black & White-7 , Чёрно-белое-7
+Black & White-8 , Чёрно-белое 8
+Black & White-9 , Чёрно-белое-9
 Black Crayon Graffiti , черные карандашные граффити
 Black Dices , Чёрные кубики
 Black Level , Уровень черного
@@ -482,28 +481,28 @@ Black to White , От черного до белого
 Blacks , Чернокожие
 Blade Runner , Лезвиевой бегунок
 Blank , Пустой
-Bleach Bypass , Отбеливающий байпас
-Bleach Bypass 1 , Отбеливающий байпас 1
-Bleach Bypass 2 , Отбеливающий байпас 2
-Bleach Bypass 3 , Отбеливатель байпас 3
-Bleach Bypass 4 , Отбеливающий байпас 4
-Bleech Bypass Green , Байпасный зеленый
-Bleech Bypass Yellow 01 , Байпасный желтый 01
-Blend , Смешать
+Bleach Bypass , Блич байпас
+Bleach Bypass 1 , Блич байпас 1
+Bleach Bypass 2 , Блич байпас 2
+Bleach Bypass 3 , Блич байпас 3
+Bleach Bypass 4 , Блич байпас 4
+Bleech Bypass Green , Блич байпас зеленый
+Bleech Bypass Yellow 01 , Блич байпас желтый 01
+Blend , Смесь
 Blend [Average All] , Смешайте [Средние все]
-Blend [Edges] , Смешать [края]
+Blend [Edges] , Смесь [края]
 Blend [Fade] , Смесь [Fade]
 Blend [Median] , Смесь [Медиана]
 Blend [Seamless] , Смесь [Бесшовная]
 Blend [Standard] , Смесь [Стандартная]
 Blend Mode , Режим смешивания
-Blend Rays , Смесительные лучи
-Blend Scales , Весы для смешивания
+Blend Rays , Смесь лучи
+Blend Scales , Смесь весы
 Blend Size , Размер смеси
 Blend Threshold , Порог смешивания
 Blending Mode , Режим смешивания
-Blending Size , Размер купажа
-Blindness Type , Тип слепоты
+Blending Size , Размер смешивания
+Blindness Type , Тип ослепления
 Blob 1 , Капля 1
 Blob 1 Color , Капля 1 Цвет
 Blob 10 , Капля 10
@@ -532,13 +531,13 @@ Blobs Editor , редактор Blobs
 Bloc , Блок
 Bloc Size (%) , Размер блока (%)
 Blockism , Блокизм
-Bloom , Блум
+Bloom , Цветение
 Blue , Синий
-Blue & Red Chrominances , Голубые и красные хромины
+Blue & Red Chrominances , Голубая и красная цветность
 Blue Chroma Factor , Синий цветовой фактор
-Blue Chroma Shift , Сдвиг синей хромы
-Blue Chroma Smoothness , Гладкость синей хромы
-Blue Chrominance , Голубое хромансирование
+Blue Chroma Shift , Сдвиг синего цвета
+Blue Chroma Smoothness , Гладкость синего цвета
+Blue Chrominance , Голубая цветность
 Blue Cold Fade , Голубое холодное угасание
 Blue Dark , Синяя Тьма
 Blue Factor , Синий фактор
@@ -565,29 +564,29 @@ Blur [Linear] , Пятно [Линейный]
 Blur [Multidirectional] , Пятно [разнонаправленное]
 Blur [Radial] , Пятно [Радиальный]
 Blur Alpha , Пятно Альфа
-Blur Amount , размытость
-Blur Amplitude , амплитуда размытия
+Blur Amount , Пятно размытость
+Blur Amplitude , Пятно амплитуда размытия
 Blur Dodge and Burn Layer , Пятно Додж и ожоговый слой
-Blur Factor , коэффициент размытости
-Blur Frame , размытая рама
-Blur Percentage , Размытый процент
-Blur Precision , точность размытия
-Blur Shade , Тень Пятна
+Blur Factor , Пятно коэффициент размытости
+Blur Frame , Пятно размытая рамка
+Blur Percentage , Пятно процент
+Blur Precision , Пятно точность размытия
+Blur Shade , Пятно Тень
 Blur Standard Deviation , Стандартная девиатура Размытия
-Blur Strength , Прочность при размывании
-Blur the Mask , Размыть Маску
+Blur Strength , Пятно Сила
+Blur the Mask , Пятно Маска
 Boats , Лодки
 Bob Ford , Боб Форд
 Bokeh , Бокэ
-Boost Chromaticity , повышенная хроматичность
-Boost Contrast , повышенный контраст
-Boost Stroke , удар тупика
-Border Color , Цвет границы
-Border Opacity , Прозрачность границ
-Border Outline , Очертание границы
-Border Smoothness , Гладкость границ
-Border Thickness (%) , Толщина границы (%)
-Border Width , Ширина границы
+Boost Chromaticity , Усиленная хроматичность
+Boost Contrast , усиленный контраст
+Boost Stroke , Усиленные мазки
+Border Color , Цвет рамки
+Border Opacity , Прозрачность рамки
+Border Outline , Очертание рамки
+Border Smoothness , Гладкость рамки
+Border Thickness (%) , Толщина рамки (%)
+Border Width , Ширина рамки
 Both , Оба
 Bottles , Бутылки
 Bottom , Нижний
@@ -595,12 +594,12 @@ Bottom and Left Foreground , Нижнее и левое поле на перед
 Bottom and Right Foreground , Нижний и правый передний план
 Bottom and Top Foreground , Нижний и верхний план
 Bottom Layer , Нижний слой
-Bottom Left , Нижнее левое
-Bottom Right , Нижнее право
+Bottom Left , Нижний левый
+Bottom Right , Нижний правый
 Bottom Size , Нижний размер
-Bottom-Left , Слева внизу
+Bottom-Left , Нижний левый
 Bottom-Left Vertex (%) , Нижняя левая вершина (%)
-Bottom-Right , Нижнее право
+Bottom-Right , Нижний правый
 Bottom-Right Vertex (%) , Нижняя-правая вершина (%)
 Bouncing Balls , Прыгающие шары
 Boundaries (%) , Границы (%)
@@ -608,8 +607,8 @@ Boundary , Граница
 Boundary Condition , Граничное условие
 Boundary Conditions , Пограничные условия
 Bourbon 64 , Бурбон 64
-Box , Вставка
-Box Fitting , Коробка Подгонка
+Box , Коробка
+Box Fitting , Коробка подгонки
 Branches , Филиалы
 Braque: Landscape near Antwerp , Брак: Пейзаж под Антверпеном
 Braque: Le Viaduc à L'Estaque , Брак: Le Viaduc à L'Estaque
@@ -630,18 +629,18 @@ Brownish , Коричневатый
 Brushify , Очистить
 Built-in Gray , Встроенный серый
 Bump Factor , коэффициент ударения
-Burn , Сжечь
-Burn Strength , Прочность при изжоге
+Burn , Прожиг
+Burn Strength , Сила прожига
 Butterfly , Бабочка
-By Blue Chrominance , Компания Blue Chrominance
+By Blue Chrominance , По синему цвету
 By Blue Component , По синей составляющей
 By Custom Expression , Посредством пользовательского выражения
-By Green Component , По Зелёному Компоненту
+By Green Component , По зелёному Компоненту
 By Iteration , По итерации
-By Lightness , По Светлости
-By Luminance , По Фирме Luminance
-By Red Chrominance , Компания Red Chrominance
-By Red Component , Красным компонентом
+By Lightness , По светлости
+By Luminance , По яркости
+By Red Chrominance , По красному цвету
+By Red Component , По красной составляющей
 By Value , По значению
 Byers 11 , Байерс 11
 C[Magenta]YK , C[пурпурный] YK
@@ -652,9 +651,9 @@ Cameraman , Оператор
 Camouflage , Камуфляж
 Candle Light , Свеча
 Canvas , Холст
-Canvas Brightness , яркость холста
+Canvas Brightness , Яркость холста
 Canvas Color , Цвет холста
-Canvas Darkness , Холстовая тьма
+Canvas Darkness , Холстовая тень
 Canvas Texture , Текстура холста
 Car , Автомобиль
 Card Suits , Костюмы для карт
@@ -707,7 +706,7 @@ Chrome 01 , Хром 01
 Chrominances Only (ab) , Только хроминансы (ab)
 Chrominances Only (CbCr) , Только хроминансы (CbCr)
 Cine Bright , Сине Брайт
-Cine Cold , Сине Холодный
+Cine Cold , Холодный синий
 Cine Drama , Кинодрама
 Cine Warm , Теплое вино
 Cinema , Кинотеатр
@@ -817,7 +816,7 @@ Color F , Цвет F
 Color G , Цвет G
 Color Gamma , Цветовая гамма
 Color Grading , Цветовая классификация
-Color Green-Magenta , Цвет зеленый-маджента
+Color Green-Magenta , Цвет зеленый-пурпурный
 Color Highlights , Цветовые акценты
 Color Image , Цветное изображение
 Color Intensity , Интенсивность цвета
@@ -825,10 +824,10 @@ Color Mask , Цветная маска
 Color Mask [Interactive] , Цветная маска [интерактивная]
 Color Median , Цвет Медианы
 Color Metric , Цветовая метрика
-Color Midtones , Цветные полутоны
+Color Midtones , Цветные полутона
 Color Mode , Цветовой режим
-Color Model , Цвет Модель
-Color Negative , Отрицательный цвет
+Color Model , Цветовая модель
+Color Negative , Негатив цвет
 Color on White , Цвет на белом
 Color Overall Effect , Общий цветовой эффект
 Color Presets , Цветовые настройки
@@ -844,7 +843,7 @@ Color Strength , Прочность цвета
 Color Temperature , Цветовая температура
 Color Tolerance , Цветовая толерантность
 Color Variation [Random -1] , Вариация цвета [Случайный -1]
-Colored Geometry , цветная геометрия
+Colored Geometry , Цветная геометрия
 Colored Grain , Цветное зерно
 Colored Lineart , Цветная линейка
 Colored on Black , Окрашен в чёрный цвет
@@ -906,7 +905,7 @@ Contour Threshold , Порог контура
 Contour Threshold (%) , Порог контура (%)
 Contours , Контуры
 Contours + Flocon/Snowflake , Контуры + флокон/снежинка
-Contours Recursion , Контуры Рекурсия
+Contours Recursion , Контуры рекурсия
 Contrail 35 , Контраил 35
 Contrast , Контраст
 Contrast (%) , Контраст (%)
@@ -923,23 +922,23 @@ Control Point 4 , Контрольная точка 4
 Control Point 5 , Контрольная точка 5
 Control Point 6 , Контрольная точка 6
 Convolve , Волна
-Cool , Крутой
-Cool (256) , Круто (256)
-Cool / Warm , Прохладно / тепло
+Cool , Холодный
+Cool (256) , Холодный (256)
+Cool / Warm , Холодный / тёплый
 Copper , Медь
 Corner Brightness , Яркость углов
 Correlated Channels , Связанные с Корреспондентами каналы
 Counter Clockwise , Против часовой стрелки
 Course 4 , Курс 4
 Cracks , Трещины
-Crease , Создать
+Crease , Складка
 Creative Pack (33) , Творческий пакет (33)
 Crip Winter , Крип-зима
-Crisp Romance , хрустящий роман
+Crisp Romance , Хрустящая романтика
 Crisp Warm , Хрустящее тепло
 Criterion , Критерий
-Crop , Обрезок
-Crop (%) , Растениеводство (%)
+Crop , Обрезка
+Crop (%) , Обрезка (%)
 Cross Process CP 130 , Кросс-процесс CP 130
 Cross Process CP 14 , Кросс-процесс CP 14
 Cross Process CP 15 , Кросс-процесс CP 15
@@ -1024,9 +1023,9 @@ De-Anaglyph , Де-анаглиф
 Debug Font Size , Размер отладочного шрифта
 Decagon , Декагон
 Decompose , Разложить
-Decompose Channels , Разлагать каналы
+Decompose Channels , Разложить каналы
 Decoration , Украшение
-Decreasing , Уменьшение
+Decreasing , Убывающий
 Deep , Глубокий
 Deep Blue , Голубой цвет
 Deep Dark Warm , Глубокое темное тепло
@@ -1036,11 +1035,11 @@ Default , По умолчанию
 Defects Contrast , Контраст дефектов
 Defects Density , Плотность дефектов
 Defects Size , Дефекты Размеры
-Defects Smoothness , Дефекты Гладкость
+Defects Smoothness , Дефекты гладкость
 Deform , Деформировать
 Delaunay-Oriented , Делоне-Ориентированный
-Delaunay: Portrait De Metzinger , Дело в том, что портрет Де Метцингера...
-Delaunay: Windows Open Simultaneously , Дело в том, что Windows открыта одновременно.
+Delaunay: Portrait De Metzinger , Делоне: Портрет Де Метцингера
+Delaunay: Windows Open Simultaneously , Делоне: Окна открываются одновременно
 Delete Layer Source , Источник удалить слой
 Delicatessen , Деликатесы
 Denim , Джинсовая ткань
@@ -1069,24 +1068,24 @@ Destination Y-Tiles , Пункт назначения Y-панели
 Detail , Подробности
 Detail Level , Уровень детализации
 Detail Reconstruction Detection , Обнаружение деталей реконструкции
-Detail Reconstruction Smoothness , Детали Реконструкция Гладкость
-Detail Reconstruction Strength , Детали Реконструкционная прочность
-Detail Reconstruction Style , Детали Стиль реконструкции
+Detail Reconstruction Smoothness , Детали реконструкция гладкость
+Detail Reconstruction Strength , Детали реконструкция резкость
+Detail Reconstruction Style , Детали стиль реконструкции
 Detail Scale , Шкала деталей
 Detail Strength , Прочность деталей
 Details , Подробности
-Details Amount , Детали Количество
-Details Equalizer , Детали эквалайзера
+Details Amount , Количество деталей
+Details Equalizer , Эквалайзер деталей
 Details Scale , Шкала деталей
-Details Smoothness , Детали Гладкость
-Details Strength (%) , Детали Прочность (%)
+Details Smoothness , Гладкость деталей
+Details Strength (%) , Резкость деталей (%)
 Detect Skin , Обнаружить кожу
 Deviation , Отклонение
 Diamond , Алмазный
 Diamond (Inv.) , Алмаз (инв.)
 Diamonds , Бриллианты
 Diamonds (Outline) , Бриллианты (Контур)
-Dices , Цифры
+Dices , Кубики
 Dices with Colored Numbers , Кубики с цветными цифрами
 Dices with Colored Sides , Кубики с цветными сторонами
 Difference , Разница
@@ -1193,11 +1192,11 @@ Edge Threshold (%) , Порог по краям (%)
 Edges , Края
 Edges (%) , Края (%)
 Edges [Animated] , Края [анимированные]
-Edges Offsets , Смещения по краям
+Edges Offsets , Края Смещение
 Edges on Fire , Края в огне
-Edges-0.5 (beware: Memory-Consuming!) , Края - 0,5 (берегись: Память-Потребитель!)
-Edges-1 (beware: Memory-Consuming!) , Края-1 (остерегайся: Память-Потребляющая!)
-Edges-2 (beware: Memory-Consuming!) , Края-2 (остерегайся: Память-Потребляющая!)
+Edges-0.5 (beware: Memory-Consuming!) , Края - 0.5 (потребляет много памяти)
+Edges-1 (beware: Memory-Consuming!) , Края-1 (потребляет много памяти)
+Edges-2 (beware: Memory-Consuming!) , Края-2 (потребляет много памяти)
 Edgy Ember , Эдди Эмбер
 Effect Strength , Прочность эффекта
 Effect X-Axis Scaling , Эффект масштабирования по оси X
@@ -1306,11 +1305,11 @@ Fading Shape , Затухающая форма
 Fall Colors , Осенние цвета
 Far Point Deviation , Девиация дальних точек
 Fast , Быстрый
-Fast &#40;Approx.&#41; , Быстро и №40; Приблизительно и №41;
-Fast (Low Precision) Preview , Быстрый (низкая точность) Предварительный просмотр
+Fast &#40;Approx.&#41; , Быстро &#40; Приблизительно &#41;
+Fast (Low Precision) Preview , Быстрый (низкая точность) Предпросмотр
 Fast Approximation , Быстрое приближение
 Fast Blend , Быстрое смешивание
-Fast Blend Preview , Предварительный просмотр быстрого смешивания
+Fast Blend Preview , Предпросмотр быстрого смешивания
 Fast Recovery , Быстрое восстановление
 Fast Resize , Быстрый размер
 Faux Infrared , Инфракрасный фальшивый
@@ -1318,16 +1317,16 @@ Feathering , Перо
 Feature Analyzer Smoothness , Гладкость анализатора функций
 Feature Analyzer Threshold , Пороговый анализатор характеристик
 Felt Pen , Фелт-Рен
-FFT Preview , Предварительный просмотр БПФ
+FFT Preview , Предпросмотр БПФ
 Fibers , Волокна
 Fibers Amplitude , Амплитуда волокна
 Fibers Smoothness , Гладкость волокон
 Fibrousness , Фиброзность
 Fidelity Chromaticity , Верность Хроматичность
-Fidelity Smoothness (Coarsest) , Гладкость верности (грубость)
-Fidelity Smoothness (Finest) , Верность Гладкость (Лучшая)
-Fidelity to Target (Coarsest) , Верность цели (Грубейшая)
-Fidelity to Target (Finest) , Верность цели (Лучшая)
+Fidelity Smoothness (Coarsest) , Гладкость достоверности (грубая)
+Fidelity Smoothness (Finest) , Гладкость достоверности (лучшая)
+Fidelity to Target (Coarsest) , Верность цели (грубая)
+Fidelity to Target (Finest) , Верность цели (лучшая)
 Filename , Фильм
 Fill Holes , Отверстия для заполнения
 Fill Holes % , Заполнение отверстий %
@@ -1345,7 +1344,7 @@ Filter Design , Дизайн фильтра
 Final Image , Окончательное изображение
 Fine , Хорошо
 Fine 2 , Мелкий 2
-Fine Details Smoothness , Тонкие детали Гладкость
+Fine Details Smoothness , Тонкие детали гладкость
 Fine Details Threshold , Порог мелкой детали
 Fine Noise , мелкий шум
 Fine Scale , Тонкая шкала
@@ -1361,7 +1360,7 @@ First Offset , Первое смещение
 First Radius , Первый Радиус
 First Size , Первый размер
 Fish-Eye , Рыбий глаз
-Fish-Eye Effect , эффект "рыбий глаз
+Fish-Eye Effect ," эффект ""рыбий глаз"
 Fitting Function , Функция установки
 Five Layers , Пять слоев
 Flag , Флаг
@@ -1446,73 +1445,73 @@ From Reference Color , С эталонного цвета
 Frosted , Морозный
 Frosted Beach Picnic , Морозный пляжный пикник
 Fruits , Фрукты
-Fuji 160C , Фудзи 160С
-Fuji 160C + , Фудзи 160С +
-Fuji 160C ++ , Фудзи 160С ++
-Fuji 160C - , Фудзи 160С -
-Fuji 3510 (Constlclip) , Фудзи 3510 (Констлэп)
-Fuji 3510 (Constlmap) , Фудзи 3510 (Констлмап)
-Fuji 3510 (Cuspclip) , Фудзи 3510 (Cuspclip)
-Fuji 3513 (Constlclip) , Фудзи 3513 (Констлэп)
-Fuji 3513 (Constlmap) , Фудзи 3513 (Констлмап)
-Fuji 3513 (Cuspclip) , Фудзи 3513 (Cuspclip)
-Fuji 400H , Фудзи 400Н
-Fuji 400H + , Фудзи 400H +
-Fuji 400H ++ , Фудзи 400H ++
-Fuji 400H - , Фудзи 400Н -
-Fuji 800Z , Фудзи 800З
-Fuji 800Z + , Фудзи 800Z +
-Fuji 800Z ++ , Фудзи 800Z ++
-Fuji 800Z - , Фудзи 800З -
-Fuji Astia 100F , Фудзи Астия 100F
-Fuji FP 100C , Фудзи FP 100C
+Fuji 160C , Fuji 160С
+Fuji 160C + , Fuji 160С +
+Fuji 160C ++ , Fuji 160С ++
+Fuji 160C - , Fuji 160С -
+Fuji 3510 (Constlclip) , Fuji 3510 (Constlclip)
+Fuji 3510 (Constlmap) , Fuji 3510 (Constlmap)
+Fuji 3510 (Cuspclip) , Fuji 3510 (Cuspclip)
+Fuji 3513 (Constlclip) , Fuji 3513 (Constlclip)
+Fuji 3513 (Constlmap) , Fuji 3513 (Constlmap)
+Fuji 3513 (Cuspclip) , Fuji 3513 (Cuspclip)
+Fuji 400H , Fuji 400Н
+Fuji 400H + , Fuji 400H +
+Fuji 400H ++ , Fuji 400H ++
+Fuji 400H - , Fuji 400Н -
+Fuji 800Z , Fuji 800З
+Fuji 800Z + , Fuji 800Z +
+Fuji 800Z ++ , Fuji 800Z ++
+Fuji 800Z - , Fuji 800З -
+Fuji Astia 100F , Fuji Астия 100F
+Fuji FP 100C , Fuji FP 100C
 Fuji FP-100c +++ , Fuji FP-100c + +++
-Fuji FP-100c Negative , Fuji FP-100c Отрицательный
-Fuji FP-100c Negative + , Fuji FP-100c Отрицательный +
-Fuji FP-100c Negative ++ , Fuji FP-100c Отрицательный ++
-Fuji FP-100c Negative +++ , Fuji FP-100c Отрицательный +++
-Fuji FP-100c Negative ++a , Fuji FP-100c Отрицательный ++a
+Fuji FP-100c Negative , Fuji FP-100c Negative
+Fuji FP-100c Negative + , Fuji FP-100c Negative +
+Fuji FP-100c Negative ++ , Fuji FP-100c Negative ++
+Fuji FP-100c Negative +++ , Fuji FP-100c Negative +++
+Fuji FP-100c Negative ++a , Fuji FP-100c Negative ++a
 Fuji FP-100c Negative - , Fuji FP-100c Отрицательно -
 Fuji FP-100c Negative -- , Fuji FP-100c Отрицательно...
-Fuji FP-3000b + , Фудзи FP-3000b +
+Fuji FP-3000b + , Fuji FP-3000b +
 Fuji FP-3000b +++ , Fuji FP-3000b + +++
-Fuji FP-3000b Negative , Фудзи FP-3000b Отрицательный
-Fuji FP-3000b Negative + , Фудзи FP-3000b Отрицательный +
-Fuji FP-3000b Negative ++ , Fuji FP-3000b Отрицательный ++
-Fuji FP-3000b Negative +++ , Fuji FP-3000b Отрицательный +++
+Fuji FP-3000b Negative , Fuji FP-3000b Negative
+Fuji FP-3000b Negative + , Fuji FP-3000b Negative +
+Fuji FP-3000b Negative ++ , Fuji FP-3000b Negative ++
+Fuji FP-3000b Negative +++ , Fuji FP-3000b Negative +++
 Fuji FP-3000b Negative - , Fuji FP-3000b Отрицательно -
 Fuji FP-3000b Negative -- , Fuji FP-3000b Отрицательно...
-Fuji FP-3000b Negative Early , Фудзи FP-3000b Отрицательный Ранний
-Fuji HDR , ГДР Фудзи
-Fuji Ilford Delta 3200 , Дельта Фудзи Ильфорда 3200
-Fuji Ilford Delta 3200 + , Фудзи Ильфорд Дельта 3200 +
-Fuji Ilford Delta 3200 ++ , Фудзи Ильфорд Дельта 3200 ++
-Fuji Ilford Delta 3200 - , Дельта Фудзи Ильфорда 3200 -
-Fuji Ilford HP5 , Фудзи Илфорд HP5
-Fuji Ilford HP5 + , Фудзи Илфорд HP5 +
-Fuji Ilford HP5 ++ , Фудзи Илфорд HP5 ++
-Fuji Ilford HP5 - , Фудзи Илфорд HP5 -
-Fuji Neopan 1600 , Фудзи-неопан 1600
-Fuji Neopan 1600 + , Фудзи Неопан 1600 +
-Fuji Neopan 1600 ++ , Фудзи Неопан 1600 ++
-Fuji Neopan 1600 - , Фудзи Неопан 1600 -
-Fuji Neopan Acros 100 , Фудзи Неопан Акрос 100
-Fuji Sensia 100 , Фудзи Сенсия 100
-Fuji Superia 100 , Фудзи Супер 100
-Fuji Superia 100 + , Фудзи Суперия 100 +
-Fuji Superia 100 ++ , Фудзи Суперия 100 ++
-Fuji Superia 1600 , Фудзи Суперия 1600
-Fuji Superia 1600 + , Фудзи Суперия 1600 +
-Fuji Superia 1600 ++ , Фудзи Суперия 1600 ++
-Fuji Superia 1600 - , Фудзи Суперия 1600 -
-Fuji Superia 200 , Фудзи Суперия 200
-Fuji Superia 400 , Фудзи Суперия 400
-Fuji Superia 400 + , Фудзи Суперия 400 +
-Fuji Superia 400 - , Фудзи Суперия 400 -
-Fuji Superia 800 , Фудзи Суперия 800
-Fuji Superia 800 + , Фудзи Суперия 800 +
-Fuji Superia Reala 100 , Фудзи Суперия Реала 100
-Fuji Velvia 50 , Фудзи-Вельвия 50
+Fuji FP-3000b Negative Early , Fuji FP-3000b Negative Ранний
+Fuji HDR , ГДР Fuji
+Fuji Ilford Delta 3200 , Дельта Fuji Ильфорда 3200
+Fuji Ilford Delta 3200 + , Fuji Ильфорд Дельта 3200 +
+Fuji Ilford Delta 3200 ++ , Fuji Ильфорд Дельта 3200 ++
+Fuji Ilford Delta 3200 - , Дельта Fuji Ильфорда 3200 -
+Fuji Ilford HP5 , Fuji Илфорд HP5
+Fuji Ilford HP5 + , Fuji Илфорд HP5 +
+Fuji Ilford HP5 ++ , Fuji Илфорд HP5 ++
+Fuji Ilford HP5 - , Fuji Илфорд HP5 -
+Fuji Neopan 1600 , Fuji-неопан 1600
+Fuji Neopan 1600 + , Fuji Неопан 1600 +
+Fuji Neopan 1600 ++ , Fuji Неопан 1600 ++
+Fuji Neopan 1600 - , Fuji Неопан 1600 -
+Fuji Neopan Acros 100 , Fuji Неопан Акрос 100
+Fuji Sensia 100 , Fuji Сенсия 100
+Fuji Superia 100 , Fuji Супер 100
+Fuji Superia 100 + , Fuji Суперия 100 +
+Fuji Superia 100 ++ , Fuji Суперия 100 ++
+Fuji Superia 1600 , Fuji Суперия 1600
+Fuji Superia 1600 + , Fuji Суперия 1600 +
+Fuji Superia 1600 ++ , Fuji Суперия 1600 ++
+Fuji Superia 1600 - , Fuji Суперия 1600 -
+Fuji Superia 200 , Fuji Суперия 200
+Fuji Superia 400 , Fuji Суперия 400
+Fuji Superia 400 + , Fuji Суперия 400 +
+Fuji Superia 400 - , Fuji Суперия 400 -
+Fuji Superia 800 , Fuji Суперия 800
+Fuji Superia 800 + , Fuji Суперия 800 +
+Fuji Superia Reala 100 , Fuji Суперия Реала 100
+Fuji Velvia 50 , Fuji-Вельвия 50
 Full , Полный текст
 Full (Allows Multi-Layers) , Полный (позволяет многослойность)
 Full (Slower) , Полный (Медленнее)
@@ -1528,9 +1527,9 @@ Futuristic Bleak 2 , футуристическая утечка 2
 Futuristic Bleak 3 , футуристическая утечка 3
 Futuristic Bleak 4 , футуристическая утечка 4
 G'MIC Operator , G'MIC Оператор
-G/M Smoothness , Гладкость Ж/М
+G/M Smoothness , Гладкость зел/пур
 Gain , Получить
-Games & Demos , Игры и демо-версии
+Games & Demos , Игры и демонстрации
 Gamma , Гамма
 Gamma (%) , Гамма (%)
 Gamma Balance , Гамма-баланс
@@ -1538,13 +1537,13 @@ Gamma Compensation , Гамма компенсация
 Gamma Equalizer , Гамма эквалайзер
 Gaussian , гауссов
 Generate Random-Colors Layer , Генерация слоя случайных цветов
-Generic Fuji Astia 100 , Дженерик Фудзи Астия 100
-Generic Fuji Provia 100 , Дженерик Fuji Provia 100
-Generic Fuji Velvia 100 , Дженерик Фудзи Вельвия 100
-Generic Kodachrome 64 , Дженерик Кодахром 64
-Generic Kodak Ektachrome 100 VS , Дженерик Кодак Эктахром 100 ВС
+Generic Fuji Astia 100 , Generic Fuji Astia 100
+Generic Fuji Provia 100 , Generic Fuji Provia 100
+Generic Fuji Velvia 100 , Generic Fuji Velvia 100
+Generic Kodachrome 64 , Generic Kodachrome 64
+Generic Kodak Ektachrome 100 VS , Generic Kodak Ektachrome 100 VS
 Generic Skin Structure , Общая структура кожи
-Gentle Mode (overrides Minimum Brightness and Minimun Red:Blue Ratio) , Нежный режим (переопределяет Минимальную яркость и Минимун Красный: Синий Соотношение)
+Gentle Mode (overrides Minimum Brightness and Minimun Red:Blue Ratio) , Нежный режим (мин. яркость и мин. пропорция красного:синего)
 Geometry , Геометрия
 Global , Глобальный
 Global Mapping , Глобальное картирование
@@ -1568,9 +1567,9 @@ Golden Sony 37 , Золотая Сони 37
 GoldFX - Bright Spring Breeze , GoldFX - Светлый весенний бриз
 GoldFX - Bright Summer Heat , GoldFX - Яркий летний зной
 GoldFX - Hot Summer Heat , GoldFX - Горячая летняя жара
-GoldFX - Perfect Sunset 01min , GoldFX - Идеальный Закат 01 мин.
-GoldFX - Perfect Sunset 05min , GoldFX - Идеальный закат 05 минут
-GoldFX - Perfect Sunset 10min , GoldFX - Идеальный закат 10 мин.
+GoldFX - Perfect Sunset 01min , GoldFX - Идеальный Закат 01мин.
+GoldFX - Perfect Sunset 05min , GoldFX - Идеальный закат 05мин
+GoldFX - Perfect Sunset 10min , GoldFX - Идеальный закат 10мин.
 GoldFX - Spring Breeze , GoldFX - Весенний бриз
 GoldFX - Summer Heat , GoldFX - Летняя жара
 Good Morning , Доброе утро
@@ -1713,7 +1712,7 @@ Horizontal Stripes , горизонтальные полосы
 Horizontal Tiles , горизонтальная плитка
 Horizontal Warp Only , Только искривление по горизонтали
 Horror Blue , Ужасная синева
-Hot , Горячий сайт
+Hot , Горячий
 Hot (256) , Горячий (256)
 Hough Sketch , Хоф Скетч
 Hough Transform , преобразование Хоуфа
@@ -1730,14 +1729,14 @@ HSV [Value] , HSV [Значение]
 HSV Select , HSV Выбор
 Hue , Оттенок
 Hue (%) , Оттенок (%)
-Hue Band , группа оттенков
-Hue Factor , фактор оттенка
+Hue Band , Группа оттенков
+Hue Factor , Фактор оттенка
 Hue Lighten-Darken , Хью Лайтен-Даркен
 Hue Max (%) , Максимальный оттенок (%)
 Hue Min (%) , Хью Мин (%)
-Hue Offset , смещение оттенка
-Hue Range , диапазон оттенков
-Hue Shift , сдвиг оттенков
+Hue Offset , Смещение оттенка
+Hue Range , Диапазон оттенков
+Hue Shift , Сдвиг оттенков
 Hue Smoothness , Гладкость оттенков
 Human  2 , Человек 2
 Human 1 , Человек 1
@@ -1865,11 +1864,11 @@ Keep Transparency in Output , Сохранить прозрачность на �
 Kernel , Кернел
 Kernel Multiplier , мультипликатор ядра
 Kernel Type , тип ядра
-Key Factor , Ключевой фактор
-Key Frame Rate , Частота смены кадров
-Key Shift , Смещение клавиш
-Key Smoothness , Ключевая гладкость
-Keypoint Influence (%) , Ключевое влияние (%)
+Key Factor , Ключ Фактор
+Key Frame Rate , Ключ Частота кадров
+Key Shift , Ключ Смещение
+Key Smoothness , Ключ Гладкость
+Keypoint Influence (%) , Влияние ключевой точки (%)
 KH 1 , КН 1
 KH 10 , КН 10
 KH 2 , КН 2
@@ -1878,7 +1877,7 @@ KH 6 , КН 6
 KH 7 , КН 7
 KH 8 , КН 8
 KH 9 , КН 9
-Kitaoka Spin Illusion , спиновая иллюзия Китаока
+Kitaoka Spin Illusion , Вращательная иллюзия Китаока
 Klee: Death and Fire , Клее: Смерть и огонь
 Klee: In the Style of Kairouan , Клее: В стиле Кайруана...
 Klee: Oriental Pleasure Garden Anagoria , Клее: Сад восточных удовольствий Анагория
@@ -1892,8 +1891,8 @@ Kodak Ektar 100 , Кодак Эктар 100
 Kodak Elite 100 XPRO , Кодак Элит 100 XPRO
 Kodak Elite Chrome 200 , Хром Кодак Элит 200
 Kodak Elite Chrome 400 , Хром Кодак Элит 400
-Kodak Elite Color 200 , Кодак Элит Цвет 200
-Kodak Elite Color 400 , Кодак Элит Цвет 400
+Kodak Elite Color 200 , Кодак Элит Колор 200
+Kodak Elite Color 400 , Кодак Элит Колор 400
 Kodak Kodachrome 200 , Кодак Кодахром 200
 Kodak Kodachrome 25 , Кодак Кодахром 25
 Kodak Kodachrome 64 , Кодак Кодахром 64
@@ -1955,16 +1954,16 @@ Lab [all] , Лаборатория [все]
 Lab [b-Chrominance] , Лаборатория [б-хромания]
 Lab [Lightness] , Лаборатория [Легкость]
 Landscape , Пейзаж
-Landscape-1 , Ландшафт-1
-Landscape-10 , Ландшафт - 10
+Landscape-1 , Пейзаж-1
+Landscape-10 , Пейзаж-10
 Landscape-2 , Пейзаж-2
-Landscape-3 , Ландшафт-3
-Landscape-4 , Ландшафт-4
-Landscape-5 , Ландшафт-5
-Landscape-6 , Ландшафт-6
-Landscape-7 , Ландшафт-7
-Landscape-8 , Ландшафт - 8
-Landscape-9 , Ландшафт - 9
+Landscape-3 , Пейзаж-3
+Landscape-4 , Пейзаж-4
+Landscape-5 , Пейзаж-5
+Landscape-6 , Пейзаж-6
+Landscape-7 , Пейзаж-7
+Landscape-8 , Пейзаж-8
+Landscape-9 , Пейзаж-9
 Laplacian , Лаплацкий
 Large , Большой
 Large Noise , Большой шум
@@ -2004,18 +2003,18 @@ Lenticular Print , линзовая печать
 Level , Уровень
 Level Frequency , Частота уровней
 Levels , Уровни
-Life Giving Tree , Дерево, дающее жизнь
-Lifestyle & Commercial-1 , Стиль жизни и коммерческий-1
-Lifestyle & Commercial-10 , Стиль жизни и коммерческий-10
-Lifestyle & Commercial-2 , Стиль жизни и коммерческий-2
-Lifestyle & Commercial-3 , Стиль жизни и коммерческий-3
-Lifestyle & Commercial-4 , Стиль жизни и коммерческий-4
-Lifestyle & Commercial-5 , Стиль жизни и коммерческий-5
-Lifestyle & Commercial-6 , Стиль жизни и коммерческий-6
-Lifestyle & Commercial-7 , Стиль жизни и коммерческий-7
-Lifestyle & Commercial-8 , Стиль жизни и коммерческий-8
-Lifestyle & Commercial-9 , Стиль жизни и коммерческий-9
-Light (blown) , Свет (перегорел)
+Life Giving Tree , Животворящее дерево
+Lifestyle & Commercial-1 , Стиль жизни и рекламный-1
+Lifestyle & Commercial-10 , Стиль жизни и рекламный-10
+Lifestyle & Commercial-2 , Стиль жизни и рекламный-2
+Lifestyle & Commercial-3 , Стиль жизни и рекламный-3
+Lifestyle & Commercial-4 , Стиль жизни и рекламный-4
+Lifestyle & Commercial-5 , Стиль жизни и рекламный-5
+Lifestyle & Commercial-6 , Стиль жизни и рекламный-6
+Lifestyle & Commercial-7 , Стиль жизни и рекламный-7
+Lifestyle & Commercial-8 , Стиль жизни и рекламный-8
+Lifestyle & Commercial-9 , Стиль жизни и рекламный-9
+Light (blown) , Свет (взрывной)
 Light Angle , Светлый угол
 Light Color , Светлый цвет
 Light Direction , Направление света
@@ -2041,7 +2040,7 @@ Lightness Level , Уровень освещенности
 Lightness Max (%) , Макс. Легкость (%)
 Lightness Min (%) , Мин-лёгкость (%)
 Lightness Shift , Сдвиг света
-Lightness Smoothness , Легкость Гладкость
+Lightness Smoothness , Легкость гладкость
 Lightning , Молния
 Lighty Smooth , Светлый Гладкий
 Limit Hue Range , Предельный диапазон оттенков
@@ -2123,8 +2122,8 @@ Lowercase Letters , Нижний регистр Буквы
 Lowlights Crossover Point , Низко освещенная точка пересечения
 Lowres CLUT , Лоурес ЗАКРЫТО
 Lucky 64 , счастливчик 64
-Luma Noise , шум Лумы
-Luminance Factor , фактор яркости
+Luma Noise , Шум Лумы
+Luminance Factor , Фактор яркости
 Luminance Level , Уровень яркости
 Luminance Only , Только яркость
 Luminance Only (Lab) , Только яркость (Лаборатория)
@@ -2137,14 +2136,14 @@ Lush Green Summer , Летняя пышная зелень
 Lutify.Me (7) , Лютифицируй. Я (7)
 LUTs Pack , СПОИ пакет
 Lylejk's Painting , Картина Лайлейка
-Magenta Coffee , Кофе "Пурпурный
+Magenta Coffee ," Кофе ""Пурпурный"
 Magenta Day , День пурпурного цвета
 Magenta Day 01 , Пурпурный день 01
-Magenta Dream , пурпурная мечта
-Magenta Factor , пурпурный фактор
-Magenta Shift , пурпурный сдвиг
-Magenta Smoothness , пурпурная гладкость
-Magenta Yellow , пурпурный жёлтый
+Magenta Dream , Пурпурная мечта
+Magenta Factor , Пурпурный фактор
+Magenta Shift , Пурпурный сдвиг
+Magenta Smoothness , Пурпурная гладкость
+Magenta Yellow , Пурпурный жёлтый
 Magenta-Yellow , Пурпурно-желтый
 Magic Details , Волшебные детали
 Magnitude / Phase , Магнитуда / Фаза
@@ -2298,22 +2297,22 @@ Mod , Мод
 Mode , Режим
 Modern Film , Современный фильм
 Modulo Value , Модульное значение
-Moir&eacute; Animation , Муар и орех; Анимация
+Moir&eacute; Animation , Муар резкий; Анимация
 Moire Removal , Удаление муара
 Moire Removal Method , Метод удаления муара
 Mona Lisa , Мона Лиза
 Mondrian: Composition in Red-Yellow-Blue , Мондриан: Состав в красно-желто-синем цвете
-Mondrian: Evening; Red Tree , Мондриан: Добрый вечер; Красное дерево
+Mondrian: Evening; Red Tree , Мондрайн: Вечер; Красное дерево
 Mondrian: Gray Tree , Мондриан: Серое дерево
-Monet: San Giorgio Maggiore at Dusk , Моне: Сан-Джорджо Маджоре на закате.
+Monet: San Giorgio Maggiore at Dusk , Моне: Сан-Джорджо Маджоре на закате
 Monet: Water-Lily Pond , Моне: Водяной пруд с лилиями
-Monet: Wheatstacks - End of Summer , Моне: стог пшеницы - конец лета
+Monet: Wheatstacks - End of Summer , Моне: Cтог пшеницы - конец лета
 Monkey , Обезьяна
 Mono , Моно
 Mono Tinted , Моно-тонированный
 Mono+G , моно+G
 Mono+R , моно+R
-Mono+Ye , Моно+Да
+Mono+Ye , Моно+Ye
 Mono-Directional , Мононаправленный
 Monochrome , Монохромный
 Monochrome 1 , монохромный 1
@@ -2333,7 +2332,7 @@ Moody-9 , Муди-9
 Moon2panorama , Лунная2панорама
 Moonlight 01 , Лунный свет 01
 Moonrise , Восход Луны
-Morning 6 , утро 6
+Morning 6 , Утро 6
 Morph [Interactive] , Морф [интерактивный]
 Morph Layers , морфологические слои
 Morphological - Fastest Sharpest Output , Морфологический - Самый быстрый острый выход
@@ -2414,16 +2413,16 @@ Nah , Нах
 Naif , Наиф
 Name , Имя
 Natural (vivid) , Натуральный (яркий)
-Nature & Wildlife-1 , Природа и дикая природа - 1
-Nature & Wildlife-10 , Природа и дикая природа-10
-Nature & Wildlife-2 , Природа и дикая природа-2
-Nature & Wildlife-3 , Природа и дикая природа-3
-Nature & Wildlife-4 , Природа и дикая природа-4
-Nature & Wildlife-5 , Природа и дикая природа-5
-Nature & Wildlife-6 , Природа и дикая природа-6
-Nature & Wildlife-7 , Природа и дикая природа-7
-Nature & Wildlife-8 , Природа и дикая природа - 8
-Nature & Wildlife-9 , Природа и дикая природа-9
+Nature & Wildlife-1 , Дикая природа - 1
+Nature & Wildlife-10 , Дикая природа-10
+Nature & Wildlife-2 , Дикая природа-2
+Nature & Wildlife-3 , Дикая природа-3
+Nature & Wildlife-4 , Дикая природа-4
+Nature & Wildlife-5 , Дикая природа-5
+Nature & Wildlife-6 , Дикая природа-6
+Nature & Wildlife-7 , Дикая природа-7
+Nature & Wildlife-8 , Дикая природа - 8
+Nature & Wildlife-9 , Дикая природа-9
 Nb Circles Surrounding , Nb Круги Окружающие
 Near Black , Почти черный
 Nearest , Ближайший
@@ -2431,13 +2430,13 @@ Nearest Neighbor , Ближайший сосед
 Neat Merge , Изящное слияние
 Negate , Отрицать
 Negation , Отрицание
-Negative , Отрицательный
-Negative [Color] (13) , Отрицательный [Цвет] (13)
-Negative [New] (39) , Отрицательный [Новый] (39)
-Negative [Old] (44) , Отрицательный [Старый] (44)
+Negative , Негатив
+Negative [Color] (13) , Негатив [Цвет] (13)
+Negative [New] (39) , Негатив [Новый] (39)
+Negative [Old] (44) , Негатив [Старый] (44)
 Negative Color Abstraction , Отрицательная цветовая абстракция
 Negative Colors , Отрицательные цвета
-Negative Effect , Отрицательный эффект
+Negative Effect , Негатив эффект
 Neighborhood Size (%) , Размер района (%)
 Neighborhood Smoothness , Соседская гладкость
 Nemesis , Немезида
@@ -2475,21 +2474,21 @@ Noise Type , Тип шума
 Non / No , Нет
 Non-Linearity , Нелинейность
 None , Нет
-None (Allows Multi-Layers) , Нет (Позволяет многослойность)
-None- Skip , None-Scip
+None (Allows Multi-Layers) , Нет (допустима многослойность)
+None- Skip , Нет - Пропустить
 Norm Type , Тип Нормы
 Normal , Нормальный
 Normal Map , Нормальная карта
-Normal Output , нормальный выход
+Normal Output , Нормальный выход
 Normalization , Нормализация
 Normalize , Нормализовать
 Normalize Brightness , Нормализовать яркость
 Normalize Colors , Нормализовать цвета
 Normalize Illumination , Нормализовать освещение
 Normalize Input , Нормализовать вход
-Normalize Luma , Нормализовать Луму
-Normalize Scales , Нормализуют весы
-Nostalgia Honey , Ностальгия, милая
+Normalize Luma , Нормализовать яркий свет
+Normalize Scales , Нормализовать весы
+Nostalgia Honey , Ностальгия мёд
 Nostalgic , Ностальгический
 Nothing , Ничего
 Number , Номер
@@ -2677,14 +2676,14 @@ Paw , Лапа
 PCA Transfer , передача PCA
 Pea Soup , Гороховый суп
 Pen Drawing , Рисунок ручкой
-Penalize Patch Repetitions , Штрафовать повторы исправлений
+Penalize Patch Repetitions , Наказывать за повторение исправлений
 Pencil , Карандаш
 Pencil Amplitude , Амплитуда карандаша
 Pencil Portrait , Карандашный портрет
 Pencil Size , Размер карандаша
 Pencil Smoother Edge Protection , Защита карандаша от размывания краев
-Pencil Smoother Sharpness , Карандаш Гладкая Острота
-Pencil Smoother Smoothness , Карандаш Гладкая гладкость
+Pencil Smoother Sharpness , Карандаш мягкая острота
+Pencil Smoother Smoothness , Карандаш мягкая гладкость
 Pencil Type , Тип карандаша
 Pencils , Карандаши
 Pentagon , Пентагон
@@ -2700,27 +2699,27 @@ Petals , Лепестки
 Phase , Этап
 Phone , Телефон
 Phong , Тонг
-PhotoComix Preset , Предустановленная настройка PhotoComix
+PhotoComix Preset , Предустановленные фотокомиксы
 Photoillustration , Фотоиллюстрация
 Picabia: Udnie , Пикабиа: Удне
-Picasso: Les Demoiselles D'Avignon , Пикассо: Les Demoiselles D'Avignon
-Picasso: Seated Woman , Пикассо: Сидячая женщина
-Picasso: The Reservoir - Horta De Ebro , Водохранилище - Хорта де Эбро...
+Picasso: Les Demoiselles D'Avignon , Пикассо: Авиньонские девицы
+Picasso: Seated Woman , Пикассо: Сидящая женщина
+Picasso: The Reservoir - Horta De Ebro , Резервуар Орта де Эбро...
 Piece Complexity , Сложность деталей
 Piece Size (px) , Размер штуки (px)
 Pin Light , Пин-лайт
 Pink Fade , Розовое затемнение
 Pinlight , Пинлайт
-Pitaya 15 , Питая, 15
+Pitaya 15 , Питая 15
 Pixel Denoise , Пиксель Денуаза
-Pixel Sort , Сорт пикселей
-Pixel Values , Значения пикселей
+Pixel Sort , Пиксель Сорт
+Pixel Values , Пиксель Значение
 PIXLS.US (31) , ПИКСЛС.США (31)
 Placement , Размещение
 Plaid , Плайд
 Plane , Самолет
 Plasma , Плазма
-Plasma Effect , плазменный эффект
+Plasma Effect , Плазменный эффект
 Plot Type , Тип участка
 Point #0 , Точка #0
 Point #1 , Пункт #1
@@ -2731,99 +2730,99 @@ Point 2 , Пункт 2
 Points , Баллы
 Poisson , Пуассон
 Polar Transform , Полярное преобразование
-Polaroid , Полароид
-Polaroid 664 , Полароид 664
-Polaroid 665 , Полароид 665
-Polaroid 665 + , Полароид 665 +
-Polaroid 665 ++ , Полароид 665 ++
-Polaroid 665 - , Полароид 665 -
-Polaroid 665 -- , Полароид 665 --
-Polaroid 665 Negative , Полароид 665 Отрицательный
-Polaroid 665 Negative + , Полароид 665 Отрицательный +
-Polaroid 665 Negative - , Полароид 665 Отрицательный -
-Polaroid 665 Negative HC , Полароид 665 Отрицательный HC
-Polaroid 667 , Полароид 667
-Polaroid 669 , Полароид 669
-Polaroid 669 + , Полароид 669 +
-Polaroid 669 ++ , Полароид 669 ++
-Polaroid 669 +++ , Полароид 669 +++
-Polaroid 669 - , Полароид 669 -
-Polaroid 669 -- , Полароид 669 --
-Polaroid 669 Cold , Полароид 669 Холодный
-Polaroid 669 Cold + , Полароид 669 Холодный +
-Polaroid 669 Cold - , Полароид 669 Холодный -
-Polaroid 669 Cold -- , Полароид 669 Холодный --
-Polaroid 672 , Полароид 672
+Polaroid , Polaroid
+Polaroid 664 , Polaroid 664
+Polaroid 665 , Polaroid 665
+Polaroid 665 + , Polaroid 665 +
+Polaroid 665 ++ , Polaroid 665 ++
+Polaroid 665 - , Polaroid 665 -
+Polaroid 665 -- , Polaroid 665 --
+Polaroid 665 Negative , Polaroid 665 Negative
+Polaroid 665 Negative + , Polaroid 665 Negative +
+Polaroid 665 Negative - , Polaroid 665 Negative -
+Polaroid 665 Negative HC , Polaroid 665 Negative HC
+Polaroid 667 , Polaroid 667
+Polaroid 669 , Polaroid 669
+Polaroid 669 + , Polaroid 669 +
+Polaroid 669 ++ , Polaroid 669 ++
+Polaroid 669 +++ , Polaroid 669 +++
+Polaroid 669 - , Polaroid 669 -
+Polaroid 669 -- , Polaroid 669 --
+Polaroid 669 Cold , Polaroid 669 Cold
+Polaroid 669 Cold + , Polaroid 669 Cold +
+Polaroid 669 Cold - , Polaroid 669 Cold -
+Polaroid 669 Cold -- , Polaroid 669 Cold --
+Polaroid 672 , Polaroid 672
 Polaroid 690 , полароид 690
-Polaroid 690 + , Полароид 690 +
-Polaroid 690 ++ , Полароид 690 ++
-Polaroid 690 - , Полароид 690 -
-Polaroid 690 -- , Полароид 690 --
-Polaroid 690 Cold , Полароид 690 Холодный
-Polaroid 690 Cold + , Полароид 690 Холодный +
-Polaroid 690 Cold ++ , Полароид 690 Холодный ++
-Polaroid 690 Cold - , Полароид 690 Холодный -
-Polaroid 690 Cold -- , Полароид 690 Холодный...
-Polaroid 690 Warm , Полароид 690 Теплый
-Polaroid 690 Warm + , Полароид 690 Теплый +
-Polaroid 690 Warm ++ , Полароид 690 Теплый ++
-Polaroid 690 Warm - , Полароид 690 Теплый -
-Polaroid 690 Warm -- , Полароид 690 Теплый...
+Polaroid 690 + , Polaroid 690 +
+Polaroid 690 ++ , Polaroid 690 ++
+Polaroid 690 - , Polaroid 690 -
+Polaroid 690 -- , Polaroid 690 --
+Polaroid 690 Cold , Polaroid 690 Cold
+Polaroid 690 Cold + , Polaroid 690 Cold +
+Polaroid 690 Cold ++ , Polaroid 690 Cold ++
+Polaroid 690 Cold - , Polaroid 690 Cold -
+Polaroid 690 Cold -- , Polaroid 690 Cold...
+Polaroid 690 Warm , Polaroid 690 Теплый
+Polaroid 690 Warm + , Polaroid 690 Теплый +
+Polaroid 690 Warm ++ , Polaroid 690 Теплый ++
+Polaroid 690 Warm - , Polaroid 690 Теплый -
+Polaroid 690 Warm -- , Polaroid 690 Теплый...
 Polaroid Polachrome , полароидный полихром
-Polaroid PX-100UV+ Cold , Полароид PX-100UV+ Холодный
-Polaroid PX-100UV+ Cold + , Полароид PX-100UV+ Холодный +
-Polaroid PX-100UV+ Cold ++ , Полароид PX-100UV+ Холодный ++
-Polaroid PX-100UV+ Cold +++ , Полароид PX-100UV+ Холодный + +++
-Polaroid PX-100UV+ Cold - , Полароид PX-100UV+ Холодный -
-Polaroid PX-100UV+ Cold -- , Полароид PX-100UV+ Холодный...
-Polaroid PX-100UV+ Warm , Полароид PX-100UV+ теплый
-Polaroid PX-100UV+ Warm + , Полароид PX-100UV+ теплый +
-Polaroid PX-100UV+ Warm ++ , Полароид PX-100UV+ теплый ++
-Polaroid PX-100UV+ Warm +++ , Полароид PX-100UV+ Теплый + +++
-Polaroid PX-100UV+ Warm - , Полароид PX-100UV+ Теплый -
-Polaroid PX-100UV+ Warm -- , Полароид PX-100UV+ Теплый...
-Polaroid PX-680 , Полароид PX-680
-Polaroid PX-680 + , Полароид PX-680 +
-Polaroid PX-680 ++ , Полароид PX-680 ++
-Polaroid PX-680 - , Полароид PX-680 -
-Polaroid PX-680 -- , Полароид PX-680 --
-Polaroid PX-680 Cold , Полароид PX-680 Холодный
-Polaroid PX-680 Cold + , Полароид PX-680 Холодный +
-Polaroid PX-680 Cold ++ , Полароид PX-680 Холодный ++
-Polaroid PX-680 Cold ++a , Полароид PX-680 Холодный ++a
-Polaroid PX-680 Cold - , Полароид PX-680 Холодный -
-Polaroid PX-680 Cold -- , Полароид PX-680 Холодный.
-Polaroid PX-680 Warm , Полароид PX-680 Теплый
-Polaroid PX-680 Warm + , Полароид PX-680 Теплый +
-Polaroid PX-680 Warm ++ , Полароид PX-680 Теплый ++
-Polaroid PX-680 Warm - , Полароид PX-680 Теплый -
-Polaroid PX-680 Warm -- , Полароид PX-680 Теплый...
-Polaroid PX-70 , Полароид PX-70
-Polaroid PX-70 + , Полароид PX-70 +
-Polaroid PX-70 ++ , Полароид PX-70 ++
-Polaroid PX-70 +++ , Полароид PX-70 +++
-Polaroid PX-70 - , Полароид PX-70 -
-Polaroid PX-70 -- , Полароид PX-70 --
-Polaroid PX-70 Cold , Полароид PX-70 Холодный
-Polaroid PX-70 Cold + , Полароид PX-70 Холодный +
-Polaroid PX-70 Cold ++ , Полароид PX-70 Холодный ++
-Polaroid PX-70 Cold - , Полароид PX-70 Холодный -
-Polaroid PX-70 Cold -- , Полароид PX-70 Холодный...
-Polaroid PX-70 Warm , Полароид PX-70 Теплый
-Polaroid PX-70 Warm + , Полароид PX-70 Теплый +
-Polaroid PX-70 Warm ++ , Полароид PX-70 Теплый ++
-Polaroid PX-70 Warm - , Полароид PX-70 Теплый -
-Polaroid PX-70 Warm -- , Полароид PX-70 Теплый...
-Polaroid Time Zero (Expired) , Полароид Время Ноль (истекло)
-Polaroid Time Zero (Expired) + , Полароид Время Ноль (истекло) +
-Polaroid Time Zero (Expired) ++ , Полароидное время Ноль (истекло) ++
-Polaroid Time Zero (Expired) - , Полароид Время Ноль (истекло) -
-Polaroid Time Zero (Expired) -- , Полароид Время Ноль (истекло)...
-Polaroid Time Zero (Expired) --- , Полароид Время Ноль (истекло) ---
-Polaroid Time Zero (Expired) Cold , Полароид Время Ноль (истекло) Холодный
-Polaroid Time Zero (Expired) Cold - , Полароид Время Ноль (истекло) Холодно -
-Polaroid Time Zero (Expired) Cold -- , Полароид Время Ноль (истекло) Холодно...
-Polaroid Time Zero (Expired) Cold --- , Полароид Время Ноль (истекло) Холодно ---
+Polaroid PX-100UV+ Cold , Polaroid PX-100UV+ Cold
+Polaroid PX-100UV+ Cold + , Polaroid PX-100UV+ Cold +
+Polaroid PX-100UV+ Cold ++ , Polaroid PX-100UV+ Cold ++
+Polaroid PX-100UV+ Cold +++ , Polaroid PX-100UV+ Cold + +++
+Polaroid PX-100UV+ Cold - , Polaroid PX-100UV+ Cold -
+Polaroid PX-100UV+ Cold -- , Polaroid PX-100UV+ Cold...
+Polaroid PX-100UV+ Warm , Polaroid PX-100UV+ теплый
+Polaroid PX-100UV+ Warm + , Polaroid PX-100UV+ теплый +
+Polaroid PX-100UV+ Warm ++ , Polaroid PX-100UV+ теплый ++
+Polaroid PX-100UV+ Warm +++ , Polaroid PX-100UV+ Теплый + +++
+Polaroid PX-100UV+ Warm - , Polaroid PX-100UV+ Теплый -
+Polaroid PX-100UV+ Warm -- , Polaroid PX-100UV+ Теплый...
+Polaroid PX-680 , Polaroid PX-680
+Polaroid PX-680 + , Polaroid PX-680 +
+Polaroid PX-680 ++ , Polaroid PX-680 ++
+Polaroid PX-680 - , Polaroid PX-680 -
+Polaroid PX-680 -- , Polaroid PX-680 --
+Polaroid PX-680 Cold , Polaroid PX-680 Cold
+Polaroid PX-680 Cold + , Polaroid PX-680 Cold +
+Polaroid PX-680 Cold ++ , Polaroid PX-680 Cold ++
+Polaroid PX-680 Cold ++a , Polaroid PX-680 Cold ++a
+Polaroid PX-680 Cold - , Polaroid PX-680 Cold -
+Polaroid PX-680 Cold -- , Polaroid PX-680 Cold.
+Polaroid PX-680 Warm , Polaroid PX-680 Теплый
+Polaroid PX-680 Warm + , Polaroid PX-680 Теплый +
+Polaroid PX-680 Warm ++ , Polaroid PX-680 Теплый ++
+Polaroid PX-680 Warm - , Polaroid PX-680 Теплый -
+Polaroid PX-680 Warm -- , Polaroid PX-680 Теплый...
+Polaroid PX-70 , Polaroid PX-70
+Polaroid PX-70 + , Polaroid PX-70 +
+Polaroid PX-70 ++ , Polaroid PX-70 ++
+Polaroid PX-70 +++ , Polaroid PX-70 +++
+Polaroid PX-70 - , Polaroid PX-70 -
+Polaroid PX-70 -- , Polaroid PX-70 --
+Polaroid PX-70 Cold , Polaroid PX-70 Cold
+Polaroid PX-70 Cold + , Polaroid PX-70 Cold +
+Polaroid PX-70 Cold ++ , Polaroid PX-70 Cold ++
+Polaroid PX-70 Cold - , Polaroid PX-70 Cold -
+Polaroid PX-70 Cold -- , Polaroid PX-70 Cold...
+Polaroid PX-70 Warm , Polaroid PX-70 Теплый
+Polaroid PX-70 Warm + , Polaroid PX-70 Теплый +
+Polaroid PX-70 Warm ++ , Polaroid PX-70 Теплый ++
+Polaroid PX-70 Warm - , Polaroid PX-70 Теплый -
+Polaroid PX-70 Warm -- , Polaroid PX-70 Теплый...
+Polaroid Time Zero (Expired) , Polaroid Time Zero (истекло)
+Polaroid Time Zero (Expired) + , Polaroid Time Zero (истекло) +
+Polaroid Time Zero (Expired) ++ , Polaroidное время Ноль (истекло) ++
+Polaroid Time Zero (Expired) - , Polaroid Time Zero (истекло) -
+Polaroid Time Zero (Expired) -- , Polaroid Time Zero (истекло)...
+Polaroid Time Zero (Expired) --- , Polaroid Time Zero (истекло) ---
+Polaroid Time Zero (Expired) Cold , Polaroid Time Zero (истекло) Cold
+Polaroid Time Zero (Expired) Cold - , Polaroid Time Zero (истекло) Холодно -
+Polaroid Time Zero (Expired) Cold -- , Polaroid Time Zero (истекло) Холодно...
+Polaroid Time Zero (Expired) Cold --- , Polaroid Time Zero (истекло) Холодно ---
 Pole Lat , Полярный лат
 Pole Long , Поляк Лонг
 Pole Rotation , Вращение полюса
@@ -2889,36 +2888,36 @@ Preserve Image Dimension , Сохранить размер изображени�
 Preserve Initial Brightness , Сохранять первоначальную яркость
 Preserve Luminance , Сохранить яркость
 Preset , Предустановленный сайт
-Preview , Предварительный просмотр
-Preview All Outputs , Предварительный просмотр всех выходов
-Preview Bands , Предварительный просмотр Полосы
+Preview , Предпросмотр
+Preview All Outputs , Предпросмотр всех выходов
+Preview Bands , Предпросмотр Полосы
 Preview Brush , Кисть предварительного просмотра
 Preview Data , Данные предварительного просмотра
-Preview Detected Shapes , Предварительный просмотр Обнаруженные формы
-Preview Frame Selection , Предварительный просмотр кадра Выбор кадра
+Preview Detected Shapes , Предпросмотр Обнаруженные формы
+Preview Frame Selection , Предпросмотр кадра Выбор кадра
 Preview Gradient , Предпросмотровый градиент
-Preview Grain Alone , Предварительный просмотр Зерно Одно
+Preview Grain Alone , Предпросмотр Зерно одно
 Preview Grid , Сетка предварительного просмотра
 Preview Guides , Путеводители по предварительному просмотру
-Preview Mapping , Предварительный просмотр Картирование
+Preview Mapping , Предпросмотр Картирование
 Preview Mask , Маска предварительного просмотра
 Preview Only Shadow , Только для предварительного просмотра Тень
 Preview Opacity (%) , Просмотр Прозрачность (%)
-Preview Original , Предварительный просмотр оригинала
+Preview Original , Предпросмотр оригинала
 Preview Precision , Точность предварительного просмотра
-Preview Progress (%) , Предварительный просмотр Прогресс (%)
-Preview Progression While Running , Предварительный просмотр прогрессии во время бега
+Preview Progress (%) , Предпросмотр Прогресс (%)
+Preview Progression While Running , Предпросмотр прогрессии во время бега
 Preview Ref Point , Точка отсчета до просмотра
 Preview Reference Circle , Ориентировочный круг предварительного просмотра
-Preview Selection , Предварительный просмотр Отбор
+Preview Selection , Предпросмотр Отбор
 Preview Shape , Форма предварительного просмотра
 Preview Shows , Предварительные показы
-Preview Split , Предварительный просмотр Сплит
-Preview Subsampling , Предварительный просмотр Субсэмплирование
+Preview Split , Предпросмотр Сплит
+Preview Subsampling , Предпросмотр Субсэмплирование
 Preview Time , Время предварительного просмотра
-Preview Tones Map , Предварительный просмотр Тоны Карта
-Preview Type , Предварительный просмотр Тип
-Preview Without Alpha , Предварительный просмотр без Альфы
+Preview Tones Map , Предпросмотр Тоны Карта
+Preview Type , Предпросмотр Тип
+Preview Without Alpha , Предпросмотр без Альфы
 Prewitt-Y , Предит-Y
 Primary Angle , Основной угол
 Primary Color , Основной цвет
@@ -2947,7 +2946,7 @@ Proportion , Доля
 Protanomaly , Протаномалия
 Protanopia , Протанопия
 Protect Highlights 01 , Защита Highlights 01
-Prussian Blue , берлинская лазурь
+Prussian Blue , Берлинская лазурь
 Pseudo-Gray Dithering , Псевдо-серый дизеринг
 Purple , Фиолетовый
 Purple11 (12) , Фиолетовый11 (12)
@@ -2961,12 +2960,12 @@ Quality , Качество
 Quality (%) , Качество (%)
 Quantization , Количество
 Quantize Colors , Количественные цвета
-Quasi-Gaussian , квази-гаусский
+Quasi-Gaussian , Квази-гаусский
 Quick , Быстрый
 Quick Copyright , Быстрое авторское право
 Quick Enlarge , Быстрое увеличение
-R/B Smoothness (Principal) , Р/Б Гладкость (Директор)
-R/B Smoothness (Secondary) , Р/Б Гладкость (вторичная)
+R/B Smoothness (Principal) , кра/син гладкость (главная)
+R/B Smoothness (Secondary) , кра/син гладкость (вторичная)
 Radial , Радиал
 Radius , Радиус
 Radius (%) , Радиус (%)
@@ -3013,13 +3012,13 @@ Red - Green - Blue , Красный - Зеленый - Синий
 Red - Green - Blue - Alpha , Красный - Зеленый - Синий - Альфа
 Red Afternoon 01 , Красный День 01
 Red Blue Yellow , Красный синий желтый
-Red Chroma Smoothness , Гладкость красной хромы
-Red Chrominance , Красное Хромонирование
+Red Chroma Smoothness , Гладкость красного цвета
+Red Chrominance , Красная цветность
 Red Day 01 , Красный день 01
 Red Dream 01 , Красная мечта 01
 Red Factor , Красный фактор
 Red Level , Красный уровень
-Red Rotations , Красные Вращения
+Red Rotations , Красные вращения
 Red Shift , Красное смещение
 Red Smoothness , Красная гладкость
 Red Wavelength , Длина волны красного цвета
@@ -3051,7 +3050,7 @@ Rejected Colors , Отклонённые цвета
 Rejected Mask , Отклонённая маска
 Relative Block Count , Количество относительных блоков
 Relative Size , Относительный размер
-Relative Warping , относительное искажение
+Relative Warping , Относительное искажение
 Release Notes , Информация о выпуске
 Relief , Рельеф
 Relief Amplitude , Амплитуда рельефа
@@ -3060,7 +3059,7 @@ Relief Light , Рельефный свет
 Relief Size , Размер рельефа
 Relief Smoothness , Гладкость рельефа
 Remix , Ремикс
-Remove Artifacts From Micro/Macro Detail , Удалить артефакты из Micro/Macro детали
+Remove Artifacts From Micro/Macro Detail , Удалить артефакты из микро/макро детали
 Remove Hot Pixels , Удалить горячие пиксели
 Remove Tile , Удалить плитку
 Remy 24 , Реми 24
@@ -3071,9 +3070,9 @@ Render Routine for Wiggle Animations , Рендер Рутина для аним
 Rendering , Оказание услуг
 Rendering Mode , Режим реендеринга
 Repair Scanned Document , Восстановить отсканированный документ
-Repeat , Повторить
-Repeat [Memory Consuming!] , Повторяю [Потребление памяти!]
-Repeats , Повторяется
+Repeat , Повтор
+Repeat [Memory Consuming!] , Повтор [потребление памяти!]
+Repeats , Повторы
 Replace , Заменить
 Replace (Sharpest) , Заменить (Sharpest)
 Replace Layer with CLUT , Заменить слой на CLUT
@@ -3098,8 +3097,8 @@ Retouch Layer , Слой ретуширования
 Retouched and Sharpened Areas , Обработанные и заточенные участки
 Retouched Areas Only , Только ретушированные зоны
 Retouched Image , Ретушированное изображение
-Retouched Image Basic , Ретушированное изображение Основное
-Retouched Image Final , Ретушированное изображение Окончательное
+Retouched Image Basic , Ретушированное изображение основное
+Retouched Image Final , Ретушированное изображение окончательное
 Retouching Style , ретуширующий стиль
 Retro , Ретро
 Retro Brown 01 , Ретро-Браун 01
@@ -3180,13 +3179,13 @@ RYB [Red] , RYB [Красный]
 RYB [Yellow] , RYB [Жёлтый]
 S-Curve Contrast , S-образный контраст
 Salt and Pepper , Соль и перец
-Same as Input , То же, что и входной
+Same as Input , Как на входе
 Same Axis , Та же ось
 Sample Image , Образец изображения
 Sampling , Выборка
-Sat Bottom , Сбботботботтома
-Sat Range , Сат-Рейндж
-Sat Top , Сат-Топ
+Sat Bottom , Сат нижний
+Sat Range , Сат диапазон
+Sat Top , Сат верхний
 Satin , Атлас
 Saturated Blue , Насыщенная синяя
 Saturation , Насыщенность
@@ -3303,24 +3302,24 @@ Shape Median , Форма Медиана
 Shape Median0 , Форма Медианы0
 Shape Min , Форма Мин
 Shape Min0 , Форма Мин0
-Shapeism , Шейпизм
+Shapeism , Трансформизм
 Shapes , Формы
-Sharp Abstract , Резкий аннотационный доклад
-Sharpen [Gradient] , Sharpen [Градиент]
-Sharpen [Hessian] , Шарпен [Гессен]
-Sharpen [Inverse Diffusion] , Sharpen [Обратная диффузия]
-Sharpen [Octave Sharpening] , Sharpen [Октава Sharpening]
-Sharpen [Richardson-Lucy] , Sharpen [Ричардсон-Люси]
-Sharpen Details in Preview , Подробности в предварительном просмотре
-Sharpen Edges Only , Только острые края
-Sharpen Object , Острый предмет
-Sharpen Radius , острый радиус
-Sharpened Areas Only , Только заточенные участки
-Sharpening , Заточка
-Sharpening Layer , Заточной слой
-Sharpening Radius , Радиус заточки
-Sharpening Strength , Прочность на заточку
-Sharpening Type , Тип заточки
+Sharp Abstract , Резкий Абстрактный
+Sharpen [Gradient] , Резкость [Градиент]
+Sharpen [Hessian] , Резкость [Гессен]
+Sharpen [Inverse Diffusion] , Резкость [Обратная диффузия]
+Sharpen [Octave Sharpening] , Резкость [Октава Sharpening]
+Sharpen [Richardson-Lucy] , Резкость [Ричардсон-Люси]
+Sharpen Details in Preview , Резкость Подробности в предпросмотре
+Sharpen Edges Only , Резкость Только края
+Sharpen Object , Резкость Объект
+Sharpen Radius , Резкость Радиус
+Sharpened Areas Only , Только резкие участки
+Sharpening , Усиление резкости
+Sharpening Layer , Усиление резкости Слой
+Sharpening Radius , Усиление резкости Радиус
+Sharpening Strength , Усиление резкости мощное
+Sharpening Type , Тип Усиления резкости
 Sharpness , Резкость
 Shift Linear Interpolation? , Линейная интерполяция сдвига?
 Shift Point , Точка переключения
@@ -3377,10 +3376,9 @@ Skip All Other Steps , Пропустить все остальные шаги
 Skip Finest Scales , Пропустить лучшие весы
 Skip Others Steps , Пропустить другие шаги
 Skip This Step , Пропустите этот шаг
-Skip to Use the Mask to Boost , Пропустите, чтобы использовать маску для усиления
+Skip to Use the Mask to Boost , Пропустите для использования маски усиления
 Slice Luminosity , Светимость срезов
 Slide [Color] (26) , Слайд [Цвет] (26)
-Slow &#40;Accurate&#41; , Медленно ( Точно )
 Slow Recovery , Медленное восстановление
 Small , Маленький
 Small (Faster) , Маленький (Быстрее)
@@ -3965,7 +3963,7 @@ Wrap , Обертка
 X Center , Центр Икс
 X Origine , X Оригинал
 X-Amplitude , X-Амплитуда
-X-Axis Then Y-Axis , Ось X, затем ось Y
+X-Axis Then Y-Axis , Ось X затем ось Y
 X-Centering (%) , X-Центр (%)
 X-Coordinate [Manual] , X-Координата [Вручную]
 X-Curvature , X-Курватура
