@@ -48,7 +48,7 @@
 #define _gimp_item_get_visible gimp_drawable_get_visible
 #endif
 
-#if GIMP_CHECK_VERSION(2, 99, 6)
+#if GIMP_CHECK_VERSION(3, 0, 0)
 #define _gimp_image_get_width gimp_image_get_width
 #define _gimp_image_get_height gimp_image_get_height
 #define _gimp_image_get_base_type gimp_image_get_base_type
@@ -64,7 +64,7 @@
 #define _gimp_drawable_get_offsets gimp_drawable_offsets
 #endif
 
-#if GIMP_CHECK_VERSION(2, 99, 0)
+#if GIMP_CHECK_VERSION(3, 0, 0)
 #define _GimpImagePtr GimpImage *
 #define _GimpLayerPtr GimpLayer *
 #define _GimpItemPtr GimpItem *
@@ -114,7 +114,7 @@ static void gmic_qt_class_init(GmicQtPluginClass * klass)
   plug_in_class->create_procedure = gmic_qt_create_procedure;
 }
 
-static void gmic_qt_init(GmicQtPlugin * gmic_qt) {}
+static void gmic_qt_init(GmicQtPlugin * gmic_qt) { unused(gmic_qt); }
 
 #else
 #define _GimpImagePtr int
@@ -482,7 +482,7 @@ void getLayersExtent(int * width, int * height, GmicQt::InputMode mode)
   // _GimpLayerPtr * begLayers = gimp_image_get_layers(gmic_qt_gimp_image_id, &layersCount);
   _GimpLayerPtr * begLayers = get_gimp_layers_flat_list(gmic_qt_gimp_image_id, &layersCount);
   _GimpLayerPtr * endLayers = begLayers + layersCount;
-#if GIMP_CHECK_VERSION(2, 99, 12)
+#if GIMP_CHECK_VERSION(3, 0, 0)
   GList * selected_layers = gimp_image_list_selected_layers(gmic_qt_gimp_image_id);
   GList * first_layer = g_list_first(selected_layers);
   _GimpLayerPtr activeLayerID = (_GimpLayerPtr)first_layer->data;
@@ -556,7 +556,7 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
   int layersCount = 0;
   _GimpLayerPtr * layers = get_gimp_layers_flat_list(gmic_qt_gimp_image_id, &layersCount);
   _GimpLayerPtr * end_layers = layers + layersCount;
-#if GIMP_CHECK_VERSION(2, 99, 12)
+#if GIMP_CHECK_VERSION(3, 0, 0)
   GList * selected_layers = gimp_image_list_selected_layers(gmic_qt_gimp_image_id);
   GList * first_layer = g_list_first(selected_layers);
   _GimpLayerPtr active_layer_id = (_GimpLayerPtr)first_layer->data;
@@ -891,7 +891,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
     }
     gimp_image_undo_group_end(gmic_qt_gimp_image_id);
   } else if (outputMode == GmicQt::OutputMode::NewActiveLayers || outputMode == GmicQt::OutputMode::NewLayers) {
-#if GIMP_CHECK_VERSION(2, 99, 12)
+#if GIMP_CHECK_VERSION(3, 0, 0)
     GList * selected_layers = gimp_image_list_selected_layers(gmic_qt_gimp_image_id);
     GList * first_layer = g_list_first(selected_layers);
     _GimpLayerPtr active_layer_id = (_GimpLayerPtr)first_layer->data;
@@ -969,17 +969,13 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
         }
 
 #if GIMP_CHECK_VERSION(3, 0, 0)
-
-        // Do nothing here.
-
-#elif GIMP_CHECK_VERSION(2, 99, 12)
-        GimpLayer * selected_layer;
+        GimpLayer * selected_layer[2] = { 0 };
         if (outputMode == GmicQt::OutputMode::NewLayers) {
-          selected_layer = active_layer_id;
+          selected_layer[0] = active_layer_id;
         } else {
-          selected_layer = top_layer_id;
+          selected_layer[0] = top_layer_id;
         }
-        gimp_image_set_selected_layers(gmic_qt_gimp_image_id, 1, (const GimpLayer **)&selected_layer);
+        gimp_image_set_selected_layers(gmic_qt_gimp_image_id, (const GimpLayer **)selected_layer);
 #else
         if (outputMode == GmicQt::OutputMode::NewLayers) {
           gimp_image_set_active_layer(gmic_qt_gimp_image_id, active_layer_id);
@@ -991,7 +987,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
       gimp_image_undo_group_end(gmic_qt_gimp_image_id);
     }
   } else if (outputMode == GmicQt::OutputMode::NewImage && images.size()) {
-#if GIMP_CHECK_VERSION(2, 99, 12)
+#if GIMP_CHECK_VERSION(3, 0, 0)
     GList * selected_layers = gimp_image_list_selected_layers(gmic_qt_gimp_image_id);
     GList * first = g_list_first(selected_layers);
     _GimpLayerPtr active_layer_id = (_GimpLayerPtr)first->data;
@@ -1068,7 +1064,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
 
 } // namespace GmicQtHost
 
-#if !GIMP_CHECK_VERSION(2, 99, 0)
+#if !GIMP_CHECK_VERSION(3, 0, 0)
 /*
  * 'Run' function, required by the GIMP plug-in API.
  */
@@ -1159,6 +1155,7 @@ MAIN()
 
 static GList * gmic_qt_query(GimpPlugIn * plug_in)
 {
+  unused(plug_in);
   return g_list_append(NULL, g_strdup(PLUG_IN_PROC));
 }
 
@@ -1172,6 +1169,7 @@ static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_m
 static GimpValueArray * gmic_qt_run(GimpProcedure * procedure, GimpRunMode run_mode, GimpImage * image, gint n_drawables, GimpDrawable ** drawables, GimpProcedureConfig *config, gpointer run_data)
 #endif
 {
+  unused(drawables, run_data);
   gegl_init(NULL, NULL);
   // gimp_plugin_enable_precision(); // what is this?
   GmicQt::RunParameters pluginParameters;
