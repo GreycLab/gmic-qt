@@ -7,7 +7,7 @@ if you want to help with the *Italian* translation of the filters
 ## Step 1: Edit the `it.csv` file
 
 * The `.csv` files are located in the
-[translations/filters](https://github.com/c-koi/gmic-qt/tree/master/translations/filters)
+[translations/filters](https://github.com/GreycLab/gmic-qt/tree/master/translations/filters)
 folder.
 
 * They contain only automatic translations for now (except for French and Chinese).
@@ -18,9 +18,9 @@ Therefore they really need some editing!
 * The CSV file contains up to 3 columns :
 
 ```txt
-Original text , Translation [, Filter name] 
+Original text , Translation [, Filter name]
 ```
- 
+
 Filter name may be used to disambiguate the translation by providing a context.
 
 ## Step 2: Enable the language in `translations/filters/Makefile`

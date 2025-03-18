@@ -43,8 +43,8 @@
 
 ### Travis CI last build status
 
- * Master branch (Linux) [![Build Status](https://api.travis-ci.org/c-koi/gmic-qt.svg?branch=master)](https://travis-ci.org/c-koi/gmic-qt)
- * Devel branch (Linux) [![Build Status](https://api.travis-ci.org/c-koi/gmic-qt.svg?branch=devel)](https://travis-ci.org/c-koi/gmic-qt)
+ * Master branch (Linux) [![Build Status](https://api.travis-ci.org/GreycLab/gmic-qt.svg?branch=master)](https://travis-ci.org/GreycLab/gmic-qt)
+ * Devel branch (Linux) [![Build Status](https://api.travis-ci.org/GreycLab/gmic-qt.svg?branch=devel)](https://travis-ci.org/GreycLab/gmic-qt)
 
 ### Build instructions
 
@@ -56,7 +56,7 @@ qmake is simple to use but only really works in an environment where bash is ava
 
 ```sh
 git clone https://github.com/GreycLab/gmic.git
-git clone https://github.com/c-koi/gmic-qt.git
+git clone https://github.com/GreycLab/gmic-qt.git
 make -C gmic/src CImg.h gmic_stdlib_community.h
 cd gmic-qt
 qmake [HOST=none|gimp|paintdotnet|8bf]
@@ -69,7 +69,7 @@ cmake works on all platforms. The first part is the same and requires make and w
 
 ```sh
 git clone https://github.com/GreycLab/gmic.git
-git clone https://github.com/c-koi/gmic-qt.git
+git clone https://github.com/GreycLab/gmic-qt.git
 make -C gmic/src CImg.h gmic_stdlib_community.h
 cd gmic-qt
 ```
@@ -88,4 +88,4 @@ make
 
 ### Adapt G'MIC-Qt to new applications
 
-Developers will find guidelines and instructions for the adaptation of the plugin to a new host application in the [NEW HOST HOWTO](https://github.com/c-koi/gmic-qt/blob/master/NEW_HOST_HOWTO.md).
+Developers will find guidelines and instructions for the adaptation of the plugin to a new host application in the [NEW HOST HOWTO](https://github.com/GreycLab/gmic-qt/blob/master/NEW_HOST_HOWTO.md).

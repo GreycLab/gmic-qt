@@ -26,7 +26,7 @@ Consequently, in order to adapt the plug-in to a new host application cleanly, a
 
 In all these steps, valuable hints may be obtained from the [implementation for the GIMP host](src/Host/Gimp), found in the [src/Host](src/Host) folder, which is where all of a given host related code should go (for the plugin side).
 
-If you succeed in creating such a file for a new host application, you are welcome to open a [pull request.](https://github.com/c-koi/gmic-qt/pulls)
+If you succeed in creating such a file for a new host application, you are welcome to open a [pull request.](https://github.com/GreycLab/gmic-qt/pulls)
 
 ### Guidelines
 
@@ -36,4 +36,4 @@ However, we have decided that contributions will be now accepted in this (upstre
 
 Note that we do not deny the fact that some other "tweaked" versions of the G'MIC-Qt plugin (that do not follow the rules defined above) may work for other host applications. Simply, we cannot guarantee their proper functioning. We will not endorse the responsibility of any crash or data loss that may occur with such implementations. We will probably not help in updating these plugins with the newest G'MIC features either. We let the authors of these alternative implementations deal with these issues.
 
-Anyway, we will be happy to share links to these alternative implementations when we become aware of them, [here](https://github.com/c-koi/gmic-qt/blob/master/README.md) and on the official [G'MIC website](https://gmic.eu).
+Anyway, we will be happy to share links to these alternative implementations when we become aware of them, [here](https://github.com/GreycLab/gmic-qt/blob/master/README.md) and on the official [G'MIC website](https://gmic.eu).
