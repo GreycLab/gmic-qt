@@ -180,9 +180,15 @@ win32 {
 
 unix:!macx {
   DEFINES += _IS_UNIX_
-  DEFINES += cimg_display=1
-  PKGCONFIG += x11
-  message( Unix/X11 platform )
+  equals( SDL, "on") { # SDL3
+    DEFINES += cimg_display=3
+    PKGCONFIG += sdl3
+    message( Unix/SDL3 platform )
+  } else { # (X11)
+    DEFINES += cimg_display=1
+    PKGCONFIG += x11
+    message( Unix/X11 platform )
+  }
 }
 
 macx {
@@ -272,13 +278,6 @@ CONFIG(release, debug|release):gcc|clang:equals(LTO,"ON") {
     message("Link Time Optimizer enabled")
     QMAKE_CXXFLAGS_RELEASE += -flto
     QMAKE_LFLAGS_RELEASE += -flto
-}
-
-equals(SDL,"on") { SDL = ON }
-CONFIG(release, debug|release):gcc|clang:equals(SDL,"ON") {
-    message("SDL3-based display enabled")
-    QMAKE_CXXFLAGS_RELEASE += -Dcimg_display=3
-    QMAKE_LFLAGS_RELEASE += -lSDL3
 }
 
 DEFINES += gmic_gui gmic_core gmic_is_parallel gmic_community cimg_use_abort
