@@ -21,6 +21,9 @@
 # Possible values are "on" or "off"
 !defined(LTO,var) { LTO=off }
 
+# Possible values are "on" or "off"
+!defined(SDL,var) { SDL=off }
+
 #
 #
 #
@@ -269,6 +272,13 @@ CONFIG(release, debug|release):gcc|clang:equals(LTO,"ON") {
     message("Link Time Optimizer enabled")
     QMAKE_CXXFLAGS_RELEASE += -flto
     QMAKE_LFLAGS_RELEASE += -flto
+}
+
+equals(SDL,"on") { SDL = ON }
+CONFIG(release, debug|release):gcc|clang:equals(SDL,"ON") {
+    message("SDL3-based display enabled")
+    QMAKE_CXXFLAGS_RELEASE += -Dcimg_display=3
+    QMAKE_LFLAGS_RELEASE += -lSDL3
 }
 
 DEFINES += gmic_gui gmic_core gmic_is_parallel gmic_community cimg_use_abort
