@@ -88,60 +88,63 @@ gmic_library::gmic_image<char> & FilterThread::persistentMemoryOutput()
   return *_persistentMemoryOutput;
 }
 
+// Decompose a status string into list of items ('strings' or 'visibilities').
+// Output list is either :
+// - A list of 'strings' (terminated by null character), if output_visibility==false;
+// - Or a list of 'visibilities' (single char in { 0,'0','1','2' }, **not** terminated by null character).
+gmic_list<char> status2Items(const char *status, const bool output_visibility) {
+  if (!status || *status!=gmic_lbrace) return gmic_list<char>();
+  const int len = (int)std::strlen(status);
+  gmic_list<char> out;
+
+  bool is_inside = false;
+  int pk = 0;
+
+  for (int k = 0; k<len; ++k) {
+    const char c = status[k];
+    switch (c) {
+    case gmic_lbrace :
+      if (!is_inside) {
+        if (k>=len - 1) return gmic_list<char>();
+        is_inside = true;
+        pk = k + 1;
+      }
+      break;
+    case gmic_rbrace : {
+      if (!is_inside) return gmic_list<char>();
+      is_inside = false;
+      char visibility = 0;
+      int ck = k;
+      if (k<len - 2 && status[k + 1]=='_' && status[k + 2]>='0' && status[k + 2]<='2') visibility = status[k+=2];
+      if (output_visibility) gmic_image<char>(1,1,1,1,visibility).move_to(out);
+      else { gmic_image<char> it(ck - pk + 1); it.back() = 0; std::memcpy(it,status + pk,it.width() - 1); it.move_to(out); }
+    } break;
+    default :
+      if (!is_inside) return gmic_list<char>();
+    }
+  }
+  return out;
+}
+
 QStringList FilterThread::status2StringList(QString status)
 {
-  // Check if status matches something like "{...}{...}_1{...}_0"
-  const QChar front = QChar::fromLatin1(gmic_lbrace);
-  QRegularExpression back(QString("%1(_[012])?$").arg(QChar::fromLatin1(gmic_rbrace)));
-  if (!(status.startsWith(front) && status.contains(back))) {
-    return QStringList();
-  }
-  status.remove(0, 1);
-  status.remove(back);
-  QRegularExpression separator(QChar::fromLatin1(gmic_rbrace) + QString("(_[012])?") + QChar::fromLatin1(gmic_lbrace));
-  QStringList list = status.split(separator);
-  QStringList::iterator it = list.begin();
-  while (it != list.end()) {
-    QByteArray array = it->toLocal8Bit();
-    gmic::strreplace_fw(array.data());
-    *it++ = QString::fromLocal8Bit(array);
-  }
-  return list;
+  QByteArray ba = status.toLocal8Bit();
+  gmic_list<char> clist = status2Items(ba.constData(),false);
+  QStringList qlist;
+  cimglist_for(clist,l) qlist<<QString(clist[l].data());
+  return qlist;
 }
 
 QList<int> FilterThread::status2Visibilities(const QString & status)
 {
-  if (status.isEmpty()) {
-    return QList<int>();
-  }
-  // Check if status matches something like "{...}{...}_1{...}_0"
-  const QChar front = QChar::fromLatin1(gmic_lbrace);
-  QRegularExpression back(QString("%1(_[012])?$").arg(QChar::fromLatin1(gmic_rbrace)));
-  if (!(status.startsWith(front) && status.contains(back))) {
-    return QList<int>();
-  }
-
   QByteArray ba = status.toLocal8Bit();
-  const char * pc = ba.constData();
-  const char * limit = pc + ba.size();
-
-  QList<int> result;
-  while (pc < limit) {
-    if (*pc == gmic_rbrace) {
-      if ((pc < limit - 2) && (pc[1] == '_') && (pc[2] >= '0') && (pc[2] <= '2') && (!pc[3] || (pc[3] == gmic_lbrace))) {
-        result.push_back(pc[2] - '0'); // AbstractParameter::VisibilityState
-        pc += 3;
-      } else if (!pc[1] || (pc[1] == gmic_lbrace)) {
-        result.push_back((int)AbstractParameter::VisibilityState::Unspecified);
-        ++pc;
-      } else {
-        return QList<int>();
-      }
-    } else {
-      ++pc;
-    }
+  gmic_list<char> clist = status2Items(ba.constData(),true);
+  QList<int> qlist;
+  cimglist_for(clist,l) {
+    const char c = clist(l,0);
+    qlist.push_back(c?c - '0':(int)AbstractParameter::VisibilityState::Unspecified);
   }
-  return result;
+  return qlist;
 }
 
 QStringList FilterThread::gmicStatus() const
