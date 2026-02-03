@@ -117,7 +117,12 @@ gmic_list<char> status2Items(const char *status, const bool output_visibility) {
       int ck = k;
       if (k<len - 2 && status[k + 1]=='_' && status[k + 2]>='0' && status[k + 2]<='2') visibility = status[k+=2];
       if (output_visibility) gmic_image<char>(1,1,1,1,visibility).move_to(out);
-      else { gmic_image<char> it(ck - pk + 1); it.back() = 0; std::memcpy(it,status + pk,it.width() - 1); it.move_to(out); }
+      else {
+        gmic_image<char> it(ck - pk + 1); it.back() = 0;
+        std::memcpy(it,status + pk,it.width() - 1);
+        gmic::strreplace_fw(it);
+        it.move_to(out);
+      }
     } break;
     default :
       if (!is_inside) return gmic_list<char>();
