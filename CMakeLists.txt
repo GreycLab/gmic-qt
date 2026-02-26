@@ -130,10 +130,10 @@ if (NOT ENABLE_SYSTEM_GMIC)
 endif()
 
 
-option(PRERELEASE "Set to ON makes this a prelease build")
+option(PRERELEASE "Set to ON makes this a prerelease build")
 if (${PRERELEASE})
     string(TIMESTAMP PRERELEASE_DATE %y%m%d)
-    message("Prelease date is " ${PRERELEASE_DATE})
+    message("Prerelease date is " ${PRERELEASE_DATE})
     add_definitions(-Dgmic_prerelease="${PRERELEASE_DATE}")
 endif()
 

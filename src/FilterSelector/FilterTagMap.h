@@ -46,7 +46,7 @@ public:
 
 protected:
 private:
-  static QMap<QString, TagColorSet> _hashesToColors; // TODO : Clean non existings hashes
+  static QMap<QString, TagColorSet> _hashesToColors; // TODO : Clean non existing hashes
   static void remove(const QString & hash);
   FiltersTagMap() = delete;
 };
