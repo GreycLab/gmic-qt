@@ -22,7 +22,14 @@ function die()
 # no param
 function gimp_version()
 {
-  local gimptool=$(command -v gimptool-3.0 >/dev/null && echo gimptool-3.0 || echo gimptool-2.0)
+  local gimptool
+  if command -v gimptool-3.2 >/dev/null; then
+    gimptool=gimptool-3.2
+  elif command -v gimptool-3.0 >/dev/null; then
+    gimptool=gimptool-3.0
+  else
+    gimptool=gimptool-2.0
+  fi
   local version=$(echo `$gimptool --version` | cut -d. -f1)
   echo ${version//* }
 }
