@@ -217,6 +217,12 @@ void FilterThread::run()
     _gmicAbort = false;
     _gmicProgress = -1;
     Logger::log(fullCommandLine, _logSuffix, true);
+    if (_images->_width <= 0 || !_images->_data) {
+      Logger::error(QString("Null inputs for command '%1'").arg(fullCommandLine), true);
+      _errorMessage = QStringLiteral("null inputs");
+      _failed = true;
+      return;
+    }
     gmic gmicInstance(_environment.isEmpty() ? nullptr : QString("%1").arg(_environment).toLocal8Bit().constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
     if (PersistentMemory::image()) {
       if (*PersistentMemory::image() == gmic_store) {
