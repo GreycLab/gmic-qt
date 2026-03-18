@@ -1031,6 +1031,8 @@ namespace
 
     InputFileParseStatus ReadColorProfile(const QString& path, cmsContext context, cmsHPROFILE* outProfile)
     {
+        *outProfile = nullptr;
+
         QFile file(path);
 
         if (!file.open(QIODevice::ReadOnly))
@@ -1129,23 +1131,27 @@ namespace
 
             host_8bf::lcmsContext = cmsCreateContext(nullptr, nullptr);
 
-            if (host_8bf::lcmsContext == nullptr)
+            if (host_8bf::lcmsContext != nullptr)
             {
-                return InputFileParseStatus::IccProfileError;
-            }
+                InputFileParseStatus status = ReadColorProfile(imageColorProfile, host_8bf::lcmsContext, &host_8bf::imageProfile);
 
-            InputFileParseStatus status = ReadColorProfile(imageColorProfile, host_8bf::lcmsContext, &host_8bf::imageProfile);
+                if (status == InputFileParseStatus::Ok)
+                {
+                    status = ReadColorProfile(displayColorProfile, host_8bf::lcmsContext, &host_8bf::displayProfile);
 
-            if (status != InputFileParseStatus::Ok)
-            {
-                return status;
-            }
-
-            status = ReadColorProfile(displayColorProfile, host_8bf::lcmsContext, &host_8bf::displayProfile);
-
-            if (status != InputFileParseStatus::Ok)
-            {
-                return status;
+                    if (status != InputFileParseStatus::Ok)
+                    {
+                        cmsCloseProfile(host_8bf::imageProfile);
+                        host_8bf::imageProfile = nullptr;
+                        cmsDeleteContext(host_8bf::lcmsContext);
+                        host_8bf::lcmsContext = nullptr;
+                    }
+                }
+                else
+                {
+                    cmsDeleteContext(host_8bf::lcmsContext);
+                    host_8bf::lcmsContext = nullptr;
+                }
             }
         }
 
