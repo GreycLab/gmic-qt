@@ -60,8 +60,9 @@ const QString & gmicConfigPath(bool create)
 #endif
   static QString result;
   QFileInfo pathInfo(qpath);
+
   if (create) gmic::init_rc();
-  if (create && pathInfo.isDir()) {
+  if (pathInfo.isDir()) {
     result = qpath;
   } else {
     result.clear();
