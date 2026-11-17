@@ -249,6 +249,7 @@ QString escapeUnescapedQuotes(const QString & text)
     }
     *out++ = *pc++;
   }
+  if (escaped) *out++ = '\\';
   QString result = QString::fromUtf8(output_str.data());
   return result;
 }
