@@ -22,13 +22,27 @@
  *  along with gmic_qt.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 #include "LayersExtentProxy.h"
 #include <QDebug>
+#include <mutex>
 #include "Common.h"
 #include "Host/GmicQtHost.h"
 
 namespace GmicQt
 {
+
+namespace
+{
+
+// The cached extent is static: serialize the accesses.
+std::mutex & extentMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+} // namespace
 
 int LayersExtentProxy::_width = -1;
 int LayersExtentProxy::_height = -1;
@@ -43,10 +57,21 @@ QSize LayersExtentProxy::getExtent(InputMode mode)
 
 void LayersExtentProxy::getExtent(InputMode mode, int & width, int & height)
 {
-  if (mode != _inputMode || _width == -1 || _height == -1) {
-    GmicQtHost::getLayersExtent(&_width, &_height, mode);
-    width = _width;
-    height = _height;
+  std::lock_guard<std::mutex> lock(extentMutex());
+  if (mode != _inputMode || _width <= 0 || _height <= 0) {
+    // The host may leave the values untouched if it fails: start from "unknown".
+    int w = -1;
+    int h = -1;
+    GmicQtHost::getLayersExtent(&w, &h, mode);
+    if ((w > 0) && (h > 0)) {
+      _width = w;
+      _height = h;
+    } else {
+      // Invalid extent: do not cache it, so that it is requested again next time.
+      _width = _height = -1;
+    }
+    width = w;
+    height = h;
   } else {
     width = _width;
     height = _height;
@@ -56,6 +81,7 @@ void LayersExtentProxy::getExtent(InputMode mode, int & width, int & height)
 
 void LayersExtentProxy::clear()
 {
+  std::lock_guard<std::mutex> lock(extentMutex());
   _width = _height = -1;
 }
 

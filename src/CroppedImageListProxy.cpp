@@ -25,13 +25,35 @@
 
 #include "CroppedImageListProxy.h"
 #include <QDebug>
+#include <algorithm>
 #include <cmath>
+#include <mutex>
 #include "Common.h"
 #include "Host/GmicQtHost.h"
 #include "gmic.h"
 
 namespace GmicQt
 {
+
+namespace
+{
+
+// The caches are static: serialize the accesses, so that the lists cannot be modified while they are being copied.
+// The mutex is recursive because get() calls update().
+std::recursive_mutex & proxyMutex()
+{
+  static std::recursive_mutex mutex;
+  return mutex;
+}
+
+// Size of a scaled dimension. It is at least 1 pixel: for CImg::resize(), a null size would
+// empty the image and a negative one means a percentage.
+int scaledSize(int size, double zoom)
+{
+  return static_cast<int>(std::max(1.0, std::min(std::round(size * zoom), static_cast<double>(size))));
+}
+
+} // namespace
 
 double CroppedImageListProxy::_x = -1.0;
 double CroppedImageListProxy::_y = -1.0;
@@ -45,6 +67,7 @@ std::unique_ptr<gmic_library::gmic_list<char>> CroppedImageListProxy::_cachedIma
 void CroppedImageListProxy::get(gmic_library::gmic_list<gmic_pixel_type> & images, gmic_library::gmic_list<char> & imageNames,
                                 double x, double y, double width, double height, InputMode mode, double zoom)
 {
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
   if ((x != _x) || (y != _y) || (width != _width) || (height != _height) || (mode != _inputMode) || (zoom != _zoom)) {
     update(x, y, width, height, mode, zoom);
   }
@@ -54,23 +77,37 @@ void CroppedImageListProxy::get(gmic_library::gmic_list<gmic_pixel_type> & image
 
 void CroppedImageListProxy::update(double x, double y, double width, double height, InputMode mode, double zoom)
 {
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
+  // The parameters are recorded only once the images have been successfully retrieved: if the host
+  // throws (e.g. std::bad_alloc), the cache must not pretend to hold the images of these parameters.
+  // Clearing first also guarantees that the host never appends to some outdated list.
+  clear();
+  try {
+    GmicQtHost::getCroppedImages(*_cachedImageList, *_cachedImageNames, x, y, width, height, mode);
+    if (std::isfinite(zoom) && (zoom > 0.0) && (zoom < 1.0)) {
+      for (unsigned int i = 0; i < _cachedImageList->size(); ++i) {
+        gmic_image<float> & image = (*_cachedImageList)[i];
+        if (!image.is_empty()) {
+          image.resize(scaledSize(image.width(), zoom), scaledSize(image.height(), zoom), 1, -100, 1);
+        }
+      }
+    }
+  } catch (...) {
+    _cachedImageList->assign();
+    _cachedImageNames->assign();
+    throw;
+  }
   _x = x;
   _y = y;
   _width = width;
   _height = height;
   _inputMode = mode;
   _zoom = zoom;
-  GmicQtHost::getCroppedImages(*_cachedImageList, *_cachedImageNames, _x, _y, _width, _height, _inputMode);
-  if (zoom < 1.0) {
-    for (unsigned int i = 0; i < _cachedImageList->size(); ++i) {
-      gmic_image<float> & image = (*_cachedImageList)[i];
-      image.resize(std::round(image.width() * zoom), std::round(image.height() * zoom), 1, -100, 1);
-    }
-  }
 }
 
 void CroppedImageListProxy::clear()
 {
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
   _cachedImageList->assign();
   _cachedImageNames->assign();
   _x = _y = _width = _height = -1.0;

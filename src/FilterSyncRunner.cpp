@@ -24,8 +24,11 @@
  */
 #include "FilterSyncRunner.h"
 #include <QDebug>
+#include <QByteArray>
 #include <QThread>
+#include <exception>
 #include <iostream>
+#include <new>
 #include "FilterThread.h"
 #include "GmicStdlib.h"
 #include "Logger.h"
@@ -50,17 +53,10 @@ FilterSyncRunner::FilterSyncRunner(QObject * parent, const QString & command, co
     stackSize8MB = true;
   }
 #endif
-  _gmicAbort = false;
-  _failed = false;
-  _gmicProgress = 0.0f;
 }
 
-FilterSyncRunner::~FilterSyncRunner()
-{
-  delete _images;
-  delete _imageNames;
-  delete _persistentMemoryOutput;
-}
+// Defined here, where the types of the owned objects are complete
+FilterSyncRunner::~FilterSyncRunner() = default;
 
 void FilterSyncRunner::setArguments(const QString & str)
 {
@@ -149,6 +145,15 @@ void FilterSyncRunner::run()
   _errorMessage.clear();
   _failed = false;
   QString fullCommandLine;
+  // This function is the body of a worker thread: no exception may escape from it (that would
+  // terminate the whole host application). Any failure is reported through failed() and errorMessage().
+  auto fail = [this, &fullCommandLine](const QString & message) {
+    _images->assign();
+    _imageNames->assign();
+    _errorMessage = message;
+    Logger::error(QString("When running command '%1', this error occurred:\n%2").arg(fullCommandLine, message), true);
+    _failed = true;
+  };
   try {
     fullCommandLine = commandFromOutputMessageMode(Settings::outputMessageMode());
     appendWithSpace(fullCommandLine, _command);
@@ -156,7 +161,8 @@ void FilterSyncRunner::run()
     _gmicAbort = false;
     _gmicProgress = -1;
     Logger::log(fullCommandLine, _logSuffix, true);
-    gmic gmicInstance(_environment.isEmpty() ? nullptr : QString("%1").arg(_environment).toLocal8Bit().constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
+    const QByteArray environment = _environment.toLocal8Bit(); // Must outlive the construction of the interpreter
+    gmic gmicInstance(_environment.isEmpty() ? nullptr : environment.constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
     if (PersistentMemory::image()) {
       if (*PersistentMemory::image() == gmic_store) {
         gmicInstance.set_variable("_persistent", PersistentMemory::image());
@@ -166,17 +172,22 @@ void FilterSyncRunner::run()
     }
     gmicInstance.set_variable("_host", '=', GmicQtHost::ApplicationShortname);
     gmicInstance.set_variable("_tk", '=', "qt");
-    gmicInstance.run(fullCommandLine.toLocal8Bit().constData(), *_images, *_imageNames);
+    const QByteArray commandLine = fullCommandLine.toLocal8Bit();
+    gmicInstance.run(commandLine.constData(), *_images, *_imageNames);
     _gmicStatus = QString::fromLocal8Bit(gmicInstance.status);
     gmicInstance.get_variable("_persistent").move_to(*_persistentMemoryOutput);
   } catch (gmic_exception & e) {
-    _images->assign();
-    _imageNames->assign();
-    const char * message = e.what();
-    _errorMessage = message;
-    Logger::error(QString("When running command '%1', this error occurred:\n%2").arg(fullCommandLine).arg(message), true);
-    _failed = true;
+    fail(QString::fromUtf8(e.what()));
+  } catch (std::bad_alloc &) {
+    fail(QString("Not enough memory"));
+  } catch (std::exception & e) { // e.g. CImg exceptions
+    fail(QString::fromLocal8Bit(e.what()));
+  } catch (...) {
+    fail(QString("Unknown error"));
   }
 }
 
 } // namespace GmicQt
+
+
+

@@ -25,12 +25,25 @@
 
 #include "CroppedActiveLayerProxy.h"
 #include <QDebug>
+#include <mutex>
 #include "Common.h"
 #include "Host/GmicQtHost.h"
 #include "gmic.h"
 
 namespace GmicQt
 {
+
+namespace
+{
+
+// The cache is static: serialize the accesses. The mutex is recursive because get() and getSize() call update().
+std::recursive_mutex & proxyMutex()
+{
+  static std::recursive_mutex mutex;
+  return mutex;
+}
+
+} // namespace
 
 double CroppedActiveLayerProxy::_x = -1.0;
 double CroppedActiveLayerProxy::_y = -1.0;
@@ -40,6 +53,7 @@ std::unique_ptr<gmic_library::gmic_image<gmic_pixel_type>> CroppedActiveLayerPro
 
 void CroppedActiveLayerProxy::get(gmic_library::gmic_image<gmic_pixel_type> & image, double x, double y, double width, double height)
 {
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
   if ((x != _x) || (y != _y) || (width != _width) || (height != _height)) {
     update(x, y, width, height);
   }
@@ -48,6 +62,7 @@ void CroppedActiveLayerProxy::get(gmic_library::gmic_image<gmic_pixel_type> & im
 
 QSize CroppedActiveLayerProxy::getSize(double x, double y, double width, double height)
 {
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
   if ((x != _x) || (y != _y) || (width != _width) || (height != _height)) {
     update(x, y, width, height);
   }
@@ -56,26 +71,29 @@ QSize CroppedActiveLayerProxy::getSize(double x, double y, double width, double 
 
 void CroppedActiveLayerProxy::clear()
 {
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
   _cachedImage->assign();
   _x = _y = _width = _height = -1.0;
 }
 
 void CroppedActiveLayerProxy::update(double x, double y, double width, double height)
 {
-  _x = x;
-  _y = y;
-  _width = width;
-  _height = height;
-
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
+  // The parameters are recorded only once the image has been successfully retrieved: if the host
+  // throws (e.g. std::bad_alloc), the cache must not pretend to hold the image of these parameters.
+  clear();
   gmic_library::gmic_list<gmic_pixel_type> images;
   gmic_library::gmic_list<char> imageNames;
-  GmicQtHost::getCroppedImages(images, imageNames, _x, _y, _width, _height, InputMode::Active);
+  GmicQtHost::getCroppedImages(images, imageNames, x, y, width, height, InputMode::Active);
   if (images.size() > 0) {
     GmicQtHost::applyColorProfile(images.front());
     _cachedImage->swap(images.front());
-  } else {
-    clear();
+    _x = x;
+    _y = y;
+    _width = width;
+    _height = height;
   }
+  // Otherwise the cache stays cleared (and will be filled again at the next request)
 }
 
 } // namespace GmicQt

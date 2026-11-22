@@ -39,14 +39,14 @@ namespace GmicQt
 
 void buildPreviewImage(const gmic_library::gmic_list<float> & images, gmic_library::gmic_image<float> & result)
 {
-  gmic_library::gmic_list<gmic_pixel_type> preview_input_images;
   if (images.size() > 0) {
-    preview_input_images.push_back(images[0]);
-    int spectrum = 0;
-    cimglist_for(preview_input_images, l) { spectrum = std::max(spectrum, preview_input_images[l].spectrum()); }
+    // Only the first image is used: work on a copy of it (no need for an intermediate list), and
+    // modify the result only once the conversion has succeeded.
+    gmic_library::gmic_image<gmic_pixel_type> preview(images[0]);
+    int spectrum = preview.spectrum();
     spectrum += (spectrum == 1 || spectrum == 3);
-    cimglist_for(preview_input_images, l) { calibrateImage(preview_input_images[l], spectrum, true); }
-    result.swap(preview_input_images.front());
+    calibrateImage(preview, spectrum, true);
+    result.swap(preview);
   } else {
     result.assign();
   }
@@ -72,3 +72,6 @@ template bool hasAlphaChannel(const gmic_library::gmic_image<float> &);
 template bool hasAlphaChannel(const gmic_library::gmic_image<unsigned char> &);
 
 } // namespace GmicQt
+
+
+

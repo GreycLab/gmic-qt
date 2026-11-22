@@ -25,9 +25,12 @@
 #ifndef GMIC_QT_FILTERSYNCRUNNER_H
 #define GMIC_QT_FILTERSYNCRUNNER_H
 
+#include <QList>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QTime>
+#include <memory>
 
 #include "Common.h"
 #include "GmicQt.h"
@@ -36,8 +39,9 @@ class QObject;
 
 namespace gmic_library
 {
+template <typename T> struct gmic_image;
 template <typename T> struct gmic_list;
-}
+} // namespace gmic_library
 
 namespace GmicQt
 {
@@ -47,7 +51,7 @@ class FilterSyncRunner : public QObject {
 public:
   FilterSyncRunner(QObject * parent, const QString & command, const QString & arguments, const QString & environment);
 
-  virtual ~FilterSyncRunner();
+  ~FilterSyncRunner() override;
   void setArguments(const QString &);
   void setInputImages(const gmic_library::gmic_list<float> & list);
   void setImageNames(const gmic_library::gmic_list<char> & imageNames);
@@ -70,13 +74,15 @@ private:
   QString _command;
   QString _arguments;
   QString _environment;
-  gmic_library::gmic_list<float> * _images;
-  gmic_library::gmic_list<char> * _imageNames;
-  gmic_library::gmic_image<char> * _persistentMemoryOutput;
-  bool _gmicAbort;
-  bool _failed;
+  // Owned objects (their types are complete in the .cpp file, where the constructor and destructor are defined)
+  std::unique_ptr<gmic_library::gmic_list<float>> _images;
+  std::unique_ptr<gmic_library::gmic_list<char>> _imageNames;
+  std::unique_ptr<gmic_library::gmic_image<char>> _persistentMemoryOutput;
+  // The G'MIC interpreter reads (and writes) these two values through pointers, from the worker thread
+  bool _gmicAbort = false;
+  bool _failed = false;
   QString _gmicStatus;
-  float _gmicProgress;
+  float _gmicProgress = 0.0f;
   QString _errorMessage;
   QString _name;
   QString _logSuffix;
@@ -85,3 +91,6 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_FILTERSYNCRUNNER_H
+
+
+
