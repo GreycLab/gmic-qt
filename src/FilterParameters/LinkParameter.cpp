@@ -27,12 +27,75 @@
 #include <QDesktopServices>
 #include <QGridLayout>
 #include <QLabel>
-#include <QRegularExpression>
 #include <QString>
 #include <QUrl>
 #include "Common.h"
 #include "FilterTextTranslator.h"
 #include "HtmlTranslator.h"
+#include "Logger.h"
+
+namespace
+{
+
+// The URL of a link comes from a filter definition, i.e. from a source that may be downloaded from the
+// Internet or supplied by the user. Only web and e-mail links are opened: other schemes (file:, smb:,
+// ms-msdt:, or any scheme registered by an application) could launch arbitrary programs or documents.
+bool isAllowedLinkUrl(const QUrl & url)
+{
+  if (!url.isValid()) {
+    return false;
+  }
+  const QString scheme = url.scheme(); // Always lower case
+  if ((scheme == "http") || (scheme == "https")) {
+    return !url.host().isEmpty();
+  }
+  if (scheme == "mailto") {
+    return !url.path().isEmpty();
+  }
+  return false;
+}
+
+// Splits a comma-separated list of arguments, ignoring the commas that are inside double quotes
+// (a backslash escapes the next character, inside quotes).
+QList<QString> splitArguments(const QString & text)
+{
+  QList<QString> result;
+  QString current;
+  bool inQuotes = false;
+  for (int i = 0; i < text.size(); ++i) {
+    const QChar c = text.at(i);
+    if (inQuotes && (c == QChar('\\')) && (i + 1 < text.size())) {
+      current.append(c);
+      current.append(text.at(++i));
+      continue;
+    }
+    if (c == QChar('"')) {
+      inQuotes = !inQuotes;
+    } else if ((c == QChar(',')) && !inQuotes) {
+      result.push_back(current);
+      current.clear();
+      continue;
+    }
+    current.append(c);
+  }
+  result.push_back(current);
+  return result;
+}
+
+// Removes the leading and trailing spaces, then a leading and a trailing double quote (if any).
+QString unquoted(const QString & text)
+{
+  QString result = text.trimmed();
+  if (result.startsWith(QChar('"'))) {
+    result.remove(0, 1);
+  }
+  if (result.endsWith(QChar('"'))) {
+    result.chop(1);
+  }
+  return result;
+}
+
+} // namespace
 
 namespace GmicQt
 {
@@ -53,9 +116,21 @@ bool LinkParameter::addTo(QWidget * widget, int row)
 {
   _grid = dynamic_cast<QGridLayout *>(widget->layout());
   Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  if (!_grid) {
+    return false;
+  }
   _row = row;
   delete _label;
-  _label = new QLabel(QString("<a href=\"%2\">%1</a>").arg(_text).arg(_url), widget);
+  // Both the text and the URL are escaped: they are plain strings which must not be interpreted as markup
+  // (a text such as "&lt;img src=...&gt;" is decoded to "<img src=...>" by HtmlTranslator::html2txt()).
+  QString html;
+  if (isAllowedLinkUrl(QUrl(_url))) {
+    html = QString("<a href=\"%1\">%2</a>").arg(_url.toHtmlEscaped(), _text.toHtmlEscaped());
+  } else {
+    Logger::warning(QString("Link displayed as plain text (unsupported or invalid URL): %1").arg(_url));
+    html = _text.toHtmlEscaped();
+  }
+  _label = new QLabel(html, widget);
   _label->setAlignment(_alignment);
   _label->setTextFormat(Qt::RichText);
   _label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
@@ -81,15 +156,22 @@ void LinkParameter::reset() {}
 
 bool LinkParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
-  QList<QString> list = parseText("link", text, textLength);
-  if (list.isEmpty()) {
+  const QList<QString> list = parseText("link", text, textLength);
+  if (list.size() < 2) {
     return false;
   }
-  QList<QString> values = list[1].split(QChar(','));
+  // Syntax: link(url), link("text","url") or link(alignment,"text","url").
+  // Commas inside quotes belong to the text or to the URL.
+  QList<QString> values = splitArguments(list[1]);
+  if (values.size() > 3) {
+    Logger::error(QString("Invalid link parameter in filter [%1]: too many arguments (%2)").arg(filterName).arg(values.size()));
+    return false;
+  }
 
+  _alignment = Qt::AlignCenter;
   if (values.size() == 3) {
-    bool ok;
-    float a = values[0].toFloat(&ok);
+    bool ok = false;
+    const float a = values[0].toFloat(&ok);
     if (!ok) {
       return false;
     }
@@ -97,23 +179,19 @@ bool LinkParameter::initFromText(const QString & filterName, const char * text, 
       _alignment = Qt::AlignLeft;
     } else if (a == 1.0f) {
       _alignment = Qt::AlignRight;
-    } else {
-      _alignment = Qt::AlignCenter;
     }
     values.pop_front();
-  } else {
-    _alignment = Qt::AlignCenter;
   }
 
+  _text.clear();
   if (values.size() == 2) {
-    _text = values[0].trimmed().remove(QRegularExpression("^\"")).remove(QRegularExpression("\"$"));
+    _text = unquoted(values[0]);
     _text = HtmlTranslator::html2txt(FilterTextTranslator::translate(_text, filterName));
     values.pop_front();
   }
-  if (values.size() == 1) {
-    _url = values[0].trimmed().remove(QRegularExpression("^\"")).remove(QRegularExpression("\"$"));
-  }
-  if (values.isEmpty()) {
+  _url = unquoted(values.front()); // One value left (the list always has at least one element)
+  if (_url.isEmpty()) {
+    Logger::error(QString("Invalid link parameter in filter [%1]: empty URL").arg(filterName));
     return false;
   }
   if (_text.isEmpty()) {
@@ -124,7 +202,14 @@ bool LinkParameter::initFromText(const QString & filterName, const char * text, 
 
 void LinkParameter::onLinkActivated(const QString & link)
 {
-  QDesktopServices::openUrl(QUrl(link));
+  const QUrl url(link);
+  if (!isAllowedLinkUrl(url)) {
+    Logger::warning(QString("Refusing to open a link with an unsupported or invalid URL: %1").arg(link));
+    return;
+  }
+  if (!QDesktopServices::openUrl(url)) {
+    Logger::warning(QString("Could not open URL: %1").arg(link));
+  }
 }
 
 } // namespace GmicQt
