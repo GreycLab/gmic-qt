@@ -24,7 +24,9 @@
  */
 #include "MainWindow.h"
 #include <QAction>
+#include <QCheckBox>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QCursor>
 #include <QDebug>
 #include <QEvent>
@@ -32,12 +34,16 @@
 #include <QKeySequence>
 #include <QMessageBox>
 #include <QPalette>
+#include <QResizeEvent>
 #include <QScreen>
 #include <QSettings>
 #include <QShortcut>
 #include <QShowEvent>
 #include <QStringList>
 #include <QStyleFactory>
+#include <QTimer>
+#include <algorithm>
+#include <limits>
 #include "Common.h"
 #include "CroppedActiveLayerProxy.h"
 #include "CroppedImageListProxy.h"
@@ -376,17 +382,17 @@ void MainWindow::onUpdateDownloadsFinished(int status)
 
   buildFiltersTree();
 
-  if (status == (int)Updater::UpdateStatus::SomeFailed) {
+  if (status == static_cast<int>(Updater::UpdateStatus::SomeFailed)) {
     if (!ui->progressInfoWidget->hasBeenCanceled()) {
       showUpdateErrors();
     }
-  } else if (status == (int)Updater::UpdateStatus::Successful) {
+  } else if (status == static_cast<int>(Updater::UpdateStatus::Successful)) {
     if (ui->cbInternetUpdate->isChecked()) {
       QMessageBox::information(this, tr("Update completed"), tr("Filter definitions have been updated."));
     } else {
       showMessage(tr("Filter definitions have been updated."), 3000);
     }
-  } else if (status == (int)Updater::UpdateStatus::NotNecessary) {
+  } else if (status == static_cast<int>(Updater::UpdateStatus::NotNecessary)) {
     showMessage(tr("No download was needed."), 3000);
   }
 
@@ -482,7 +488,7 @@ void MainWindow::retrieveFilterAndParametersFromPluginParameters(QString & hash,
   } catch (const QString & errorMessage) {
     hash.clear();
     parameters.clear();
-    QMessageBox::critical(this, "Error with plugin arguments", errorMessage);
+    QMessageBox::critical(this, tr("Error with plugin arguments"), errorMessage);
   }
 }
 
@@ -505,19 +511,20 @@ void MainWindow::updateFilters(bool internet)
 
 void MainWindow::onStartupFiltersUpdateFinished(int status)
 {
-  bool ok = QObject::disconnect(Updater::getInstance(), &Updater::updateIsDone, this, &MainWindow::onStartupFiltersUpdateFinished);
+  const bool ok = QObject::disconnect(Updater::getInstance(), &Updater::updateIsDone, this, &MainWindow::onStartupFiltersUpdateFinished);
   Q_ASSERT_X(ok, __PRETTY_FUNCTION__, "Cannot disconnect Updater::updateIsDone from MainWindow::onStartupFiltersUpdateFinished");
+  Q_UNUSED(ok)
 
   ui->progressInfoWidget->stopAnimationAndHide();
-  if (status == (int)Updater::UpdateStatus::SomeFailed) {
+  if (status == static_cast<int>(Updater::UpdateStatus::SomeFailed)) {
     if (Settings::notifyFailedStartupUpdate()) {
       showMessage(tr("Filters update could not be achieved"), 3000);
     }
-  } else if (status == (int)Updater::UpdateStatus::Successful) {
+  } else if (status == static_cast<int>(Updater::UpdateStatus::Successful)) {
     if (Updater::getInstance()->someNetworkUpdateAchieved()) {
       showMessage(tr("Filter definitions have been updated."), 4000);
     }
-  } else if (status == (int)Updater::UpdateStatus::NotNecessary) {
+  } else if (status == static_cast<int>(Updater::UpdateStatus::NotNecessary)) {
   }
 
   if (QSettings().value(FAVES_IMPORT_KEY, false).toBool() || !FavesModelReader::gmicGTKFaveFileAvailable()) {
@@ -635,8 +642,9 @@ void MainWindow::timerEvent(QTimerEvent * e)
   if (e->timerId() == _messageTimerID) {
     clearMessage();
     e->accept();
+    return;
   }
-  e->ignore();
+  QMainWindow::timerEvent(e);
 }
 
 void MainWindow::showMessage(const QString & text, int ms)
@@ -644,7 +652,7 @@ void MainWindow::showMessage(const QString & text, int ms)
   clearMessage();
   if (!text.isEmpty()) {
     ui->messageLabel->setText(text);
-    if (ms) {
+    if (ms > 0) {
       _messageTimerID = startTimer(ms);
     }
   }
@@ -769,11 +777,13 @@ void MainWindow::onPreviewKeypointsEvent(unsigned int flags, unsigned long time)
   } else {
     ui->filterParams->setKeypoints(ui->previewWidget->keypoints(), false);
     if ((flags & PreviewWidget::KeypointBurstEvent)) {
-      const auto t = static_cast<ulong>(_processor.lastPreviewFilterExecutionDurationMS());
-      const bool keypointBurstEnabled = (t <= KEYPOINTS_INTERACTIVE_LOWER_DELAY_MS) ||
-                                        ((t <= KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS) && ((ulong)_processor.averagePreviewFilterExecutionDuration() <= KEYPOINTS_INTERACTIVE_MIDDLE_DELAY_MS));
-      ulong msSinceLastBurstEvent = time - _lastPreviewKeypointBurstUpdateTime;
-      if (keypointBurstEnabled && (msSinceLastBurstEvent >= (ulong)_processor.lastPreviewFilterExecutionDurationMS())) {
+      // Durations are ints: make sure a negative value is never converted to a huge unsigned one
+      const auto lastDuration = static_cast<ulong>(std::max(0, _processor.lastPreviewFilterExecutionDurationMS()));
+      const auto averageDuration = static_cast<ulong>(std::max(0, _processor.averagePreviewFilterExecutionDuration()));
+      const bool keypointBurstEnabled = (lastDuration <= KEYPOINTS_INTERACTIVE_LOWER_DELAY_MS) || ((lastDuration <= KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS) && (averageDuration <= KEYPOINTS_INTERACTIVE_MIDDLE_DELAY_MS));
+      // The event time may go backwards (clock reset/wrap): do not let the unsigned subtraction wrap around by accident
+      const ulong msSinceLastBurstEvent = (time >= _lastPreviewKeypointBurstUpdateTime) ? (time - _lastPreviewKeypointBurstUpdateTime) : std::numeric_limits<ulong>::max();
+      if (keypointBurstEnabled && (msSinceLastBurstEvent >= lastDuration)) {
         onPreviewUpdateRequested(true);
         _lastPreviewKeypointBurstUpdateTime = time;
       }
@@ -886,7 +896,7 @@ void MainWindow::onVeryFirstShowEvent()
   if (_newSession) {
     Logger::clear();
   }
-  QObject::connect(Updater::getInstance(), &Updater::updateIsDone, this, &MainWindow::onStartupFiltersUpdateFinished);
+  QObject::connect(Updater::getInstance(), &Updater::updateIsDone, this, &MainWindow::onStartupFiltersUpdateFinished, Qt::UniqueConnection);
   Logger::setMode(Settings::outputMessageMode());
   Updater::setOutputMessageMode(Settings::outputMessageMode());
   int ageLimit;
@@ -967,7 +977,7 @@ void MainWindow::onApplyClicked()
 void MainWindow::onOkClicked()
 {
   if (_filtersPresenter->currentFilter().isNoApplyFilter()) {
-    _isAccepted = _processor.completedFullImageProcessingCount();
+    _isAccepted = (_processor.completedFullImageProcessingCount() > 0);
     close();
     return;
   }
@@ -977,7 +987,7 @@ void MainWindow::onOkClicked()
     _pendingActionAfterCurrentProcessing = ProcessingAction::Ok;
     processImage();
   } else {
-    _isAccepted = _processor.completedFullImageProcessingCount();
+    _isAccepted = (_processor.completedFullImageProcessingCount() > 0);
     close();
   }
 }
@@ -1079,7 +1089,7 @@ void MainWindow::saveSettings()
     settings.setValue(QString("Config/PanelSize%1").arg(i), splitterSizes.at(i));
   }
   splitterSizes = ui->verticalSplitter->sizes();
-  if (!_filtersPresenter->currentFilter().hash.isEmpty() && !_filtersPresenter->currentFilter().isInvalid()) {
+  if ((splitterSizes.size() >= 2) && !_filtersPresenter->currentFilter().hash.isEmpty() && !_filtersPresenter->currentFilter().isInvalid()) {
     settings.setValue(QString("Config/ParamsVerticalSplitterSizeTop"), splitterSizes.at(0));
     settings.setValue(QString("Config/ParamsVerticalSplitterSizeBottom"), splitterSizes.at(1));
   }
@@ -1140,8 +1150,8 @@ void MainWindow::loadSettings()
   // Splitter sizes
   QList<int> sizes;
   for (int i = 0; i < 3; ++i) {
-    int s = settings.value(QString("Config/PanelSize%1").arg(i), 0).toInt();
-    if (s) {
+    const int s = settings.value(QString("Config/PanelSize%1").arg(i), 0).toInt();
+    if (s > 0) { // Reject zero and (corrupted) negative sizes
       sizes.push_back(s);
     }
   }
@@ -1154,7 +1164,7 @@ void MainWindow::loadSettings()
 
 void MainWindow::setPreviewPosition(MainWindow::PreviewPosition position)
 {
-  if (position == _previewPosition) {
+  if ((position == _previewPosition) || (ui->splitter->count() < 3)) {
     return;
   }
   _previewPosition = position;
@@ -1215,7 +1225,7 @@ void MainWindow::adjustVerticalSplitter()
   sizes.push_back(settings.value(QString("Config/ParamsVerticalSplitterSizeTop"), -1).toInt());
   sizes.push_back(settings.value(QString("Config/ParamsVerticalSplitterSizeBottom"), -1).toInt());
   const int splitterHeight = ui->verticalSplitter->height();
-  if ((sizes.front() != -1) && (sizes.back() != -1) && (sizes.front() + sizes.back() <= splitterHeight)) {
+  if ((sizes.front() >= 0) && (sizes.back() >= 0) && (sizes.front() + sizes.back() <= splitterHeight)) {
     ui->verticalSplitter->setSizes(sizes);
   } else {
     const int inOutHeight = std::max(ui->inOutSelector->sizeHint().height(), 75);
@@ -1321,6 +1331,7 @@ void MainWindow::setNoFilter()
 void MainWindow::showEvent(QShowEvent * event)
 {
   TIMING;
+  QMainWindow::showEvent(event);
   event->accept();
   if (!_showEventReceived) {
     _showEventReceived = true;
@@ -1330,6 +1341,7 @@ void MainWindow::showEvent(QShowEvent * event)
 
 void MainWindow::resizeEvent(QResizeEvent * e)
 {
+  QMainWindow::resizeEvent(e);
   // Check if size is reducing
   if ((e->size().width() < e->oldSize().width() || e->size().height() < e->oldSize().height()) && ui->pbFullscreen->isChecked() && (windowState() & Qt::WindowMaximized)) {
     ui->pbFullscreen->toggle();
@@ -1391,24 +1403,27 @@ void MainWindow::onSettingsClicked()
 {
   QList<int> splitterSizes = ui->splitter->sizes();
 
-  int previewWidth;
-  int paramsWidth;
-  int treeWidth;
-  if (_previewPosition == PreviewPosition::Left) {
-    previewWidth = splitterSizes.at(0);
-    paramsWidth = splitterSizes.at(2);
-    treeWidth = splitterSizes.at(1);
-  } else {
-    previewWidth = splitterSizes.at(2);
-    paramsWidth = splitterSizes.at(1);
-    treeWidth = splitterSizes.at(0);
+  int previewWidth = 0;
+  int paramsWidth = 0;
+  int treeWidth = 0;
+  const bool splitterSizesAvailable = (splitterSizes.size() == 3);
+  if (splitterSizesAvailable) {
+    if (_previewPosition == PreviewPosition::Left) {
+      previewWidth = splitterSizes.at(0);
+      paramsWidth = splitterSizes.at(2);
+      treeWidth = splitterSizes.at(1);
+    } else {
+      previewWidth = splitterSizes.at(2);
+      paramsWidth = splitterSizes.at(1);
+      treeWidth = splitterSizes.at(0);
+    }
   }
 
   DialogSettings dialog(this);
   dialog.exec();
   bool previewPositionChanged = (_previewPosition != Settings::previewPosition());
   setPreviewPosition(Settings::previewPosition());
-  if (previewPositionChanged) {
+  if (previewPositionChanged && splitterSizesAvailable) {
     splitterSizes.clear();
     if (_previewPosition == PreviewPosition::Left) {
       splitterSizes.push_back(previewWidth);
@@ -1482,14 +1497,15 @@ void MainWindow::onProgressionWidgetCancelClicked()
 void MainWindow::abortProcessingOnCloseRequest()
 {
   _pendingActionAfterCurrentProcessing = ProcessingAction::Close;
-  connect(&_processor, &GmicProcessor::noMoreUnfinishedJobs, this, &MainWindow::close);
+  connect(&_processor, &GmicProcessor::noMoreUnfinishedJobs, this, &MainWindow::close, Qt::UniqueConnection);
   ui->progressInfoWidget->showBusyIndicator();
   ui->previewWidget->setOverlayMessage(tr("Waiting for cancelled jobs..."));
   enableWidgetList(false);
   ui->pbCancel->setEnabled(false);
   ui->pbClose->setEnabled(false);
 
-  QTimer::singleShot(2000, [this]() {
+  // The context object guarantees that the lambda is not run if this window has been destroyed in the meantime
+  QTimer::singleShot(2000, this, [this]() {
     _pendingActionAfterCurrentProcessing = ProcessingAction::ForceQuit;
     ui->pbClose->setText(_forceQuitText);
     ui->pbClose->setEnabled(true);
@@ -1562,3 +1578,5 @@ void MainWindow::closeEvent(QCloseEvent * e)
 }
 
 } // namespace GmicQt
+
+
