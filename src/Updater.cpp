@@ -30,6 +30,7 @@
 #include <QNetworkRequest>
 #include <QTextStream>
 #include <QUrl>
+#include <algorithm>
 #include <iostream>
 #include "Common.h"
 #include "GmicStdlib.h"
@@ -110,6 +111,7 @@ void Updater::startUpdate(int ageLimit, int timeout, bool useNetwork)
   if (_pendingReplies.isEmpty()) {
     QTimer::singleShot(0, this, &Updater::onUpdateNotNecessary); // While GUI is Idle
     _networkAccessManager->deleteLater();
+    _networkAccessManager = nullptr;
   } else {
     QTimer::singleShot(timeout * 1000, this, &Updater::cancelAllPendingDownloads);
   }
@@ -128,13 +130,12 @@ bool Updater::allDownloadsOk() const
 
 void Updater::processReply(QNetworkReply * reply)
 {
-  QString url = reply->request().url().toString();
-  if (!reply->bytesAvailable()) {
-    return;
-  }
+  const QString url = reply->request().url().toString();
   QByteArray array = reply->readAll();
-  if (array.isNull()) {
+  if (array.isEmpty()) {
+    // Empty body with no network error (e.g. an HTTP redirection that is not followed)
     _errorMessages << QString(tr("Error downloading %1 (empty file?)")).arg(url);
+    touchFile(localFilename(url)); // Prevent a systematic update on next startups (see onNetworkReplyFinished())
     return;
   }
   if (isCImgCompressed(array)) {
@@ -144,6 +145,7 @@ void Updater::processReply(QNetworkReply * reply)
   }
   if (array.isNull() || !array.contains("#@gui")) {
     _errorMessages << QString(tr("Could not read/decompress %1")).arg(url);
+    touchFile(localFilename(url)); // Prevent a systematic update on next startups (see onNetworkReplyFinished())
     return;
   }
   QString filename = localFilename(url);
@@ -182,8 +184,10 @@ void Updater::onNetworkReplyFinished(QNetworkReply * reply)
     } else {
       emit updateIsDone((int)UpdateStatus::SomeFailed);
     }
-    _networkAccessManager->deleteLater();
-    _networkAccessManager = nullptr;
+    if (_networkAccessManager) {
+      _networkAccessManager->deleteLater();
+      _networkAccessManager = nullptr;
+    }
   }
   reply->deleteLater();
 }
@@ -241,7 +245,16 @@ QString Updater::localFilename(QString url)
 {
   if (url.startsWith("http://") || url.startsWith("https://")) {
     QUrl u(url);
-    return QString("%1%2").arg(gmicConfigPath(true)).arg(u.fileName());
+    // Keep a plain file name only: a backslash is not a path separator in a URL, but it is one on Windows.
+    QString name = u.fileName();
+    const int separator = std::max(name.lastIndexOf(QChar('/')), name.lastIndexOf(QChar(92)));
+    if (separator != -1) {
+      name = name.mid(separator + 1);
+    }
+    if (name == "." || name == "..") {
+      name.clear();
+    }
+    return QString("%1%2").arg(gmicConfigPath(true)).arg(name);
   }
   return url;
 }
