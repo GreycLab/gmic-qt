@@ -53,11 +53,23 @@ FiltersPresenter::FiltersPresenter(QObject * parent) : QObject(parent)
   _filtersView = nullptr;
   _searchField = nullptr;
   _visibleTagSelector = nullptr;
+  // Filter has no default member initializers: avoid reading indeterminate values before the first selection.
+  // (The strings are left as they are, so that the filter is still not considered as "invalid" at this point.)
+  _currentFilter.defaultInputMode = InputMode::Unspecified;
+  _currentFilter.isAccurateIfZoomed = false;
+  _currentFilter.previewFromFullImage = false;
+  _currentFilter.previewFactor = PreviewFactorAny;
+  _currentFilter.isAFave = false;
 }
 
 FiltersPresenter::~FiltersPresenter()
 {
-  saveFaves();
+  // Temporary presenters (see findFilterFrom...InStdlib()) have no view and never modify the faves.
+  // Saving from them would needlessly rewrite the faves file, and would even empty it when the
+  // faves have not been loaded (findFilterFromCommandInStdlib()).
+  if (_filtersView) {
+    saveFaves();
+  }
 }
 
 void FiltersPresenter::setFiltersView(FiltersView * filtersView)
@@ -66,6 +78,9 @@ void FiltersPresenter::setFiltersView(FiltersView * filtersView)
     _filtersView->disconnect(this);
   }
   _filtersView = filtersView;
+  if (!_filtersView) {
+    return;
+  }
   connect(_filtersView, &FiltersView::filterSelected, this, &FiltersPresenter::onFilterChanged);
   connect(_filtersView, &FiltersView::faveRenamed, this, &FiltersPresenter::onFaveRenamed);
   connect(_filtersView, &FiltersView::faveRemovalRequested, this, &FiltersPresenter::removeFave);
@@ -220,14 +235,15 @@ void FiltersPresenter::addSelectedFilterAsNewFave(const QList<QString> & default
     filterAlreadyHasAFave = filterExistsAsFave(filter.hash());
   } else {
     FavesModel::const_iterator faveIterator = _favesModel.findFaveFromHash(_currentFilter.hash);
-    if (faveIterator != _favesModel.cend()) {
-      const FavesModel::Fave & originalFave = *faveIterator;
-      fave.setName(_favesModel.uniqueName(originalFave.name(), QString()));
-      fave.setCommand(originalFave.command());
-      fave.setPreviewCommand(originalFave.previewCommand());
-      fave.setOriginalHash(originalFave.originalHash());
-      fave.setOriginalName(originalFave.originalName());
+    if (faveIterator == _favesModel.cend()) {
+      return; // Should not happen (checked above), but never build an empty fave
     }
+    const FavesModel::Fave & originalFave = *faveIterator;
+    fave.setName(_favesModel.uniqueName(originalFave.name(), QString()));
+    fave.setCommand(originalFave.command());
+    fave.setPreviewCommand(originalFave.previewCommand());
+    fave.setOriginalHash(originalFave.originalHash());
+    fave.setOriginalName(originalFave.originalName());
     filterAlreadyHasAFave = true;
   }
 
@@ -255,7 +271,7 @@ void FiltersPresenter::applySearchCriterion(const QString & text)
     return;
   }
   static QString previousText;
-  if ((!text.isEmpty() && previousText.isEmpty()) || (text.isEmpty() && previousText.isEmpty())) {
+  if (previousText.isEmpty()) { // Whatever the new text is
     _filtersView->preserveExpandedFolders();
   }
   QList<QString> keywords = text.split(QChar(' '), QT_SKIP_EMPTY_PARTS);
@@ -317,8 +333,9 @@ void FiltersPresenter::selectFilterFromPlainName(const QString & name)
       }
     } else { // filterHashes.size() == 1
       hash = filterHashes.front();
-      if (_filtersView) {
-        _filtersView->selectFave(hash);
+      // This is a filter, not a fave: selectFave() would find nothing
+      if (_filtersView && _filtersModel.contains(hash)) {
+        _filtersView->selectActualFilter(hash, _filtersModel.getFilterFromHash(hash).path());
       }
     }
   }
@@ -340,13 +357,19 @@ void FiltersPresenter::selectFilterFromCommand(const QString & command)
 void FiltersPresenter::setVisibleTagSelector(VisibleTagSelector * selector)
 {
   _visibleTagSelector = selector;
+  if (!selector) {
+    return;
+  }
   connect(selector, &VisibleTagSelector::visibleColorsChanged, this, &FiltersPresenter::setVisibleTagColors);
 }
 
 void FiltersPresenter::setVisibleTagColors(unsigned int colors)
 {
+  if (!_filtersView) {
+    return;
+  }
   _filtersView->setVisibleTagColors(TagColorSet(colors));
-  applySearchCriterion(_searchField->text());
+  applySearchCriterion(_searchField ? _searchField->text() : QString());
 }
 
 void FiltersPresenter::selectFilterFromAbsolutePath(QString path)
@@ -495,6 +518,9 @@ void FiltersPresenter::editSelectedFaveName()
 void FiltersPresenter::onFaveRenamed(const QString & hash, const QString & name)
 {
   Q_ASSERT_X(_favesModel.contains(hash), "onFaveRenamed()", "Hash not found");
+  if (!_favesModel.contains(hash)) {
+    return; // Would otherwise access a non-existent fave in release mode
+  }
   FavesModel::Fave fave = _favesModel.getFaveFromHash(hash);
   _favesModel.removeFave(hash);
 
@@ -546,7 +572,7 @@ void FiltersPresenter::toggleSelectionMode(bool on)
       _filtersView->disableSelectionMode();
     }
   }
-  applySearchCriterion(_searchField->text());
+  applySearchCriterion(_searchField ? _searchField->text() : QString());
 }
 
 void FiltersPresenter::onFilterChanged(const QString & hash)
@@ -573,11 +599,14 @@ void FiltersPresenter::removeFave(const QString & hash)
 
 void FiltersPresenter::onTagToggled(int)
 {
+  if (!_visibleTagSelector || !_filtersView) {
+    return;
+  }
   TagColorSet colors = _visibleTagSelector->selectedColors();
   _visibleTagSelector->updateColors();
   if (_visibleTagSelector->selectedColors() != colors) {
     _filtersView->setVisibleTagColors(TagColorSet::Empty);
-    applySearchCriterion(_searchField->text());
+    applySearchCriterion(_searchField ? _searchField->text() : QString());
   }
 }
 
@@ -660,11 +689,13 @@ void FiltersPresenter::Filter::clear()
   previewCommand.clear();
   parameters.clear();
   defaultParameterValues.clear();
+  defaultVisibilityStates.clear();
   fullPath.clear();
   hash.clear();
   plainTextName.clear();
   previewFactor = PreviewFactorAny;
   previewFromFullImage = false;
+  isAccurateIfZoomed = false;
   defaultInputMode = InputMode::Unspecified;
   isAFave = false;
 }
@@ -711,3 +742,5 @@ const char * FiltersPresenter::Filter::previewFactorString() const
 }
 
 } // namespace GmicQt
+
+
