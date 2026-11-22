@@ -31,11 +31,13 @@
 #include <QList>
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
+#include <QRegularExpressionMatchIterator>
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
 #include "Common.h"
 #include "GmicQt.h"
+#include "Logger.h"
 #include "Utils.h"
 #include "gmic.h"
 
@@ -51,7 +53,13 @@ void GmicStdLib::loadStdLib() // TODO : Remove
   QFile stdlib(path);
   if ((info.size() == 0) || !stdlib.open(QFile::ReadOnly)) {
     gmic_image<char> stdlib_h = gmic::decompress_stdlib();
-    Array = QByteArray::fromRawData(stdlib_h, stdlib_h.size());
+    if (stdlib_h.size() < 2) { // Nothing (or only the terminating null character): Array[Array.size() - 1] would be invalid
+      Logger::error("Could not decompress gmic builtin stdlib");
+      Array.clear();
+      return;
+    }
+    // Deep copy: fromRawData() would reference a buffer which is released when stdlib_h goes out of scope
+    Array = QByteArray(stdlib_h.data(), int(stdlib_h.size()));
     Array[Array.size() - 1] = '\n';
   } else {
     Array = stdlib.readAll();
@@ -60,33 +68,46 @@ void GmicStdLib::loadStdLib() // TODO : Remove
 
 QString GmicStdLib::substituteSourceVariables(QString text)
 {
-  QRegularExpression reVariables[] = {
+  // Built once (regular expressions are costly to build)
 #ifdef _IS_WINDOWS_
-      QRegularExpression{"%([A-Za-z_][A-Za-z0-9_]+)%"} //
+  static const QRegularExpression reVariables("%([A-Za-z_][A-Za-z0-9_]+)%");
 #else
-      QRegularExpression{"\\$([A-Za-z_][A-Za-z0-9_]+)"},  //
-      QRegularExpression{"\\${([A-Za-z_][A-Za-z0-9_]+)}"} //
-#endif
-  };
-
-#ifdef _IS_WINDOWS_
-  text.replace("%VERSION%", QString::number(GmicQt::GmicVersion));
-#else
-  text.replace("$VERSION", QString::number(GmicQt::GmicVersion));
-  text.replace("${VERSION}", QString::number(GmicQt::GmicVersion));
+  // $NAME or ${NAME}
+  static const QRegularExpression reVariables("\\$(?:([A-Za-z_][A-Za-z0-9_]+)|\\{([A-Za-z_][A-Za-z0-9_]+)\\})");
 #endif
 
-  for (QRegularExpression re : reVariables) {
-    QRegularExpressionMatch match;
-    while ((match = re.match(text)).hasMatch()) {
-      QByteArray value = qgetenv(match.captured(1).toLocal8Bit().constData());
+  // The text is scanned only once: what is substituted is never scanned again. Previously, a variable whose
+  // value contained a reference to itself (e.g. FOO='${FOO}'), or two variables referring to each other,
+  // made this function loop forever while the text kept growing.
+  QString result;
+  int copiedUpTo = 0;
+  QRegularExpressionMatchIterator it = reVariables.globalMatch(text);
+  while (it.hasNext()) {
+    const QRegularExpressionMatch match = it.next();
+    QString name = match.captured(1);
+    if (name.isEmpty()) {
+      name = match.captured(2); // ${NAME} form
+    }
+    QString replacement;
+    if (name == QString("VERSION")) {
+      replacement = QString::number(GmicQt::GmicVersion);
+    } else {
+      const QByteArray value = qgetenv(name.toLocal8Bit().constData());
       if (value.isEmpty()) { // Undefined variables should yield an ignored source
         return {};
       }
-      text.replace(match.captured(0), QString::fromLocal8Bit(value));
+      replacement = QString::fromLocal8Bit(value);
     }
+    const int begin = int(match.capturedStart());
+    result.append(text.mid(copiedUpTo, begin - copiedUpTo));
+    result.append(replacement);
+    copiedUpTo = int(match.capturedEnd());
   }
-  return text;
+  if (copiedUpTo == 0) {
+    return text; // No variable
+  }
+  result.append(text.mid(copiedUpTo));
+  return result;
 }
 
 QStringList GmicStdLib::substituteSourceVariables(const QStringList & list)
@@ -107,3 +128,6 @@ QByteArray GmicStdLib::hash()
 }
 
 } // namespace GmicQt
+
+
+

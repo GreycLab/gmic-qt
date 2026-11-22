@@ -31,16 +31,78 @@
 
 #include <QDir>
 #include <QLocale>
-#include <QRegularExpression>
+#include <QSettings>
+#include <QStringList>
+#include <algorithm>
+#include <limits>
 namespace
 {
-GmicQt::OutputMessageMode filterDeprecatedOutputMessageMode(const GmicQt::OutputMessageMode & mode)
+
+/*
+ * Values read from the settings (a text file or the registry, which can be edited by hand,
+ * written by another version of the plugin, or be corrupted) are validated before being used.
+ */
+
+int readInt(const QSettings & settings, const QString & key, int defaultValue)
 {
-  if (mode == GmicQt::OutputMessageMode::VerboseLayerName_DEPRECATED) {
+  bool ok = false;
+  const int value = settings.value(key, defaultValue).toInt(&ok);
+  return ok ? value : defaultValue; // toInt() returns 0 on failure, which is a meaningful value here
+}
+
+GmicQt::OutputMessageMode sanitizedOutputMessageMode(int value)
+{
+  switch (value) {
+  case static_cast<int>(GmicQt::OutputMessageMode::Quiet):
+  case static_cast<int>(GmicQt::OutputMessageMode::VerboseConsole):
+  case static_cast<int>(GmicQt::OutputMessageMode::VerboseLogFile):
+  case static_cast<int>(GmicQt::OutputMessageMode::VeryVerboseConsole):
+  case static_cast<int>(GmicQt::OutputMessageMode::VeryVerboseLogFile):
+  case static_cast<int>(GmicQt::OutputMessageMode::DebugConsole):
+  case static_cast<int>(GmicQt::OutputMessageMode::DebugLogFile):
+    return static_cast<GmicQt::OutputMessageMode>(value);
+  default: // Includes the mode removed since 2.9.5 (stored as 1), Unspecified and unknown values
     return GmicQt::DefaultOutputMessageMode;
   }
-  return mode;
 }
+
+int sanitizedUpdatePeriodicity(int hours)
+{
+  // 0 means "at launch", std::numeric_limits<int>::max() means "never"
+  return (hours < 0) ? INTERNET_DEFAULT_PERIODICITY : hours;
+}
+
+int sanitizedPreviewTimeout(int seconds)
+{
+  // Same range as the settings dialog (0 means "no timeout")
+  return std::min(std::max(seconds, 0), 999);
+}
+
+QString sanitizedLanguageCode(const QString & code)
+{
+  if (code.size() > 16) {
+    return QString();
+  }
+  for (const QChar & c : code) {
+    const bool ok = (c.unicode() < 128) && (c.isLetterOrNumber() || (c == QChar('_')) || (c == QChar('-')));
+    if (!ok) {
+      return QString();
+    }
+  }
+  return code;
+}
+
+QStringList sanitizedSources(const QStringList & sources)
+{
+  QStringList result;
+  for (const QString & source : sources) {
+    if (!source.isEmpty()) { // Same rule as SourcesWidget::list()
+      result.push_back(source);
+    }
+  }
+  return result;
+}
+
 } // namespace
 
 namespace GmicQt
@@ -80,7 +142,7 @@ void Settings::load(UserInterfaceMode userInterfaceMode)
   QSettings settings;
   _visibleLogos = settings.value("LogosAreVisible", true).toBool();
   _darkThemeEnabled = settings.value(DARK_THEME_KEY, GmicQtHost::DarkThemeIsDefault).toBool();
-  _languageCode = settings.value(LANGUAGE_CODE_KEY, QString()).toString();
+  _languageCode = sanitizedLanguageCode(settings.value(LANGUAGE_CODE_KEY, QString()).toString());
 
   if (settings.value("Config/PreviewPosition", "Right").toString() == "Left") {
     _previewPosition = MainWindow::PreviewPosition::Left;
@@ -90,17 +152,19 @@ void Settings::load(UserInterfaceMode userInterfaceMode)
   _filterTranslationEnabled = settings.value(ENABLE_FILTER_TRANSLATION, false).toBool();
   _nativeColorDialogs = settings.value("Config/NativeColorDialogs", false).toBool();
   _nativeFileDialogs = settings.value("Config/NativeFileDialogs", false).toBool();
-  _updatePeriodicity = settings.value(INTERNET_UPDATE_PERIODICITY_KEY, INTERNET_DEFAULT_PERIODICITY).toInt();
+  _updatePeriodicity = sanitizedUpdatePeriodicity(readInt(settings, INTERNET_UPDATE_PERIODICITY_KEY, INTERNET_DEFAULT_PERIODICITY));
   FolderParameterDefaultValue = settings.value("FolderParameterDefaultValue", QDir::homePath()).toString();
   FileParameterDefaultPath = settings.value("FileParameterDefaultPath", QDir::homePath()).toString();
-  _previewTimeout = settings.value("PreviewTimeout", 16).toInt();
+  _previewTimeout = sanitizedPreviewTimeout(readInt(settings, "PreviewTimeout", 16));
   _previewZoomAlwaysEnabled = settings.value("AlwaysEnablePreviewZoom", false).toBool();
-  _outputMessageMode = filterDeprecatedOutputMessageMode((GmicQt::OutputMessageMode)settings.value("OutputMessageMode", static_cast<int>(GmicQt::DefaultOutputMessageMode)).toInt());
+  _outputMessageMode = sanitizedOutputMessageMode(readInt(settings, "OutputMessageMode", static_cast<int>(GmicQt::DefaultOutputMessageMode)));
   _notifyFailedStartupUpdate = settings.value("Config/NotifyIfStartupUpdateFails", true).toBool();
   _highDPI = settings.value(HIGHDPI_KEY, false).toBool();
-  _filterSources = settings.value("Config/FilterSources", SourcesWidget::defaultList()).toStringList();
+  _filterSources = sanitizedSources(settings.value("Config/FilterSources", SourcesWidget::defaultList()).toStringList());
 
-  QString officialFilterSource = settings.value(OFFICIAL_FILTER_SOURCE_KEY, QString("EnabledWithUpdates")).toString();
+  const QString officialFilterSource = settings.value(OFFICIAL_FILTER_SOURCE_KEY, QString("EnabledWithUpdates")).toString();
+  // Default value, also used if the stored text is not recognized (the member was left unchanged before)
+  _officialFilterSource = SourcesWidget::OfficialFilters::EnabledWithUpdates;
   if (officialFilterSource == QString("Disable")) {
     _officialFilterSource = SourcesWidget::OfficialFilters::Disabled;
   } else if (officialFilterSource == QString("EnabledWithoutUpdates")) {
@@ -146,7 +210,7 @@ QString Settings::languageCode()
 
 void Settings::setLanguageCode(const QString & code)
 {
-  _languageCode = code;
+  _languageCode = sanitizedLanguageCode(code);
 }
 
 bool Settings::filterTranslationEnabled()
@@ -196,7 +260,7 @@ int Settings::updatePeriodicity()
 
 void Settings::setUpdatePeriodicity(int hours)
 {
-  _updatePeriodicity = hours;
+  _updatePeriodicity = sanitizedUpdatePeriodicity(hours);
 }
 
 int Settings::previewTimeout()
@@ -206,7 +270,7 @@ int Settings::previewTimeout()
 
 void Settings::setPreviewTimeout(int seconds)
 {
-  _previewTimeout = seconds;
+  _previewTimeout = sanitizedPreviewTimeout(seconds);
 }
 
 OutputMessageMode Settings::outputMessageMode()
@@ -216,7 +280,7 @@ OutputMessageMode Settings::outputMessageMode()
 
 void Settings::setOutputMessageMode(OutputMessageMode mode)
 {
-  _outputMessageMode = mode;
+  _outputMessageMode = sanitizedOutputMessageMode(static_cast<int>(mode));
 }
 
 bool Settings::previewZoomAlwaysEnabled()
@@ -256,7 +320,7 @@ const QStringList & Settings::filterSources()
 
 void Settings::setFilterSources(const QStringList & sources)
 {
-  _filterSources = sources;
+  _filterSources = sanitizedSources(sources);
 }
 
 SourcesWidget::OfficialFilters Settings::officialFilterSource()
@@ -317,3 +381,6 @@ void Settings::removeObsoleteKeys(QSettings & settings)
 }
 
 } // namespace GmicQt
+
+
+
