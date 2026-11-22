@@ -154,7 +154,7 @@ bool parseGmicFilterParameters(const char * text, QStringList & args)
   bool quoted = false;
   bool escaped = false;
   bool meaningfulSpaceFound = false;
-  char * buffer = new char[strlen(pc)]();
+  char * buffer = new char[strlen(pc) + 1]();
   char * output = buffer;
   while (*pc && !((meaningfulSpaceFound = (!quoted && !escaped && isspace(*pc))))) {
     if (escaped) {
