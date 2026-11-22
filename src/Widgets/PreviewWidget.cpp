@@ -30,6 +30,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPointF>
+#include <QRadialGradient>
 #include <algorithm>
 #include <cmath>
 #include "Common.h"
@@ -333,6 +334,11 @@ void PreviewWidget::updateErrorImage()
 
 void PreviewWidget::paintKeypoints(QPainter & painter)
 {
+  // Length (in pixels) of the radial gradient going from opaque black to
+  // transparent black. It starts at the inner edge of the former 2 px outline
+  // (i.e. at radius - 1) and extends outwards.
+  static const qreal HaloLength = 8.0;
+
   QPen pen;
   pen.setColor(Qt::black);
   pen.setWidth(2);
@@ -354,15 +360,39 @@ void PreviewWidget::paintKeypoints(QPainter & painter)
         brushColor.setAlpha(255);
       }
       if (visibleRect.contains(realCenter, false)) {
+        // 1. Filled disk, without any outline
+        painter.setPen(Qt::NoPen);
         painter.setBrush(brushColor);
-        pen.setStyle(Qt::SolidLine);
+        painter.drawEllipse(r);
+
+        // 2. Black radial halo, painted over the disk. It is fully transparent
+        //    inside (radius - 1), so that semi-transparent keypoints are not
+        //    darkened at their center, then goes from opaque black at
+        //    (radius - 1) to transparent black at (radius - 1 + HaloLength).
+        const qreal innerRadius = std::max<qreal>(0.0, radius - 1.0);
+        const qreal outerRadius = innerRadius + HaloLength;
+        const qreal t = innerRadius / outerRadius;
+        const QColor opaqueBlack(0, 0, 0, brushColor.alpha());
+        const QColor clearBlack(0, 0, 0, 0);
+
+        QRadialGradient gradient(QPointF(visibleCenter), outerRadius);
+        gradient.setColorAt(0.0, clearBlack);
+        // Hard inner edge: a stop slightly before t, since two stops at the
+        // same position would replace each other.
+        gradient.setColorAt(std::max<qreal>(0.0, t - 0.001), clearBlack);
+        gradient.setColorAt(t, opaqueBlack);
+        gradient.setColorAt(1.0, clearBlack);
+
+        painter.setBrush(gradient);
+        painter.drawEllipse(QPointF(visibleCenter), outerRadius, outerRadius);
       } else {
+        // Keypoint center is outside the image: keep the former dotted outline
         painter.setBrush(brushColor.darker(150));
         pen.setStyle(Qt::DotLine);
+        pen.setColor(QColor(0, 0, 0, brushColor.alpha()));
+        painter.setPen(pen);
+        painter.drawEllipse(r);
       }
-      pen.setColor(QColor(0, 0, 0, brushColor.alpha()));
-      painter.setPen(pen);
-      painter.drawEllipse(r);
     }
     ++it;
     --index;
@@ -1410,5 +1440,3 @@ bool PreviewWidget::PreviewPoint::operator==(const PreviewWidget::PreviewPoint &
 }
 
 } // namespace GmicQt
-
-
