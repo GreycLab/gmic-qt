@@ -35,6 +35,7 @@
 #include <QPushButton>
 #include <QSpacerItem>
 #include <QWidget>
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -42,38 +43,60 @@
 #include "FilterTextTranslator.h"
 #include "HtmlTranslator.h"
 #include "KeypointList.h"
+#include "Logger.h"
 #include "Misc.h"
 #include "Settings.h"
 
 namespace GmicQt
 {
 
+namespace
+{
+
+/**
+ * Reads a point coordinate: either a finite number, or "nan" (in which case isNaN is set, and
+ * value is left unchanged). toFloat() also accepts "inf", which must not reach the widgets.
+ */
+bool parseCoordinate(const QString & text, float & value, bool & isNaN)
+{
+  const QString trimmed = text.trimmed();
+  isNaN = (trimmed.compare(QLatin1String("nan"), Qt::CaseInsensitive) == 0);
+  if (isNaN) {
+    return true;
+  }
+  bool ok = false;
+  const float v = trimmed.toFloat(&ok);
+  if (!ok || !std::isfinite(v)) {
+    return false;
+  }
+  value = v;
+  return true;
+}
+
+/**
+ * QColor::setRed(), setGreen()... invalidate the whole color when given a value outside [0,255].
+ */
+int clampedChannel(const int value)
+{
+  return std::max(0, std::min(255, value));
+}
+
+} // namespace
+
 int PointParameter::_defaultColorNextIndex = 0;
 unsigned long PointParameter::_randomSeed = 12345;
 
-PointParameter::PointParameter(QObject * parent) : AbstractParameter(parent), _defaultPosition(0, 0), _position(0, 0), _removable(false), _burst(false)
+PointParameter::PointParameter(QObject * parent) : AbstractParameter(parent)
 {
-  _label = nullptr;
-  _colorLabel = nullptr;
-  _labelX = nullptr;
-  _labelY = nullptr;
-  _spinBoxX = nullptr;
-  _spinBoxY = nullptr;
-  _removeButton = nullptr;
-  _rowCell = nullptr;
-  _notificationEnabled = true;
-  _connected = false;
-  _defaultRemovedStatus = false;
   _radius = KeypointList::Keypoint::DefaultRadius;
-  _keepOpacityWhenSelected = false;
-  _removed = false;
   setRemoved(false);
 }
 
 PointParameter::~PointParameter()
 {
-  delete _label;
-  delete _rowCell;
+  // Deleting a null (or already destroyed, thanks to QPointer) widget is harmless.
+  delete _label.data();
+  delete _rowCell.data();
 }
 
 int PointParameter::size() const
@@ -83,50 +106,70 @@ int PointParameter::size() const
 
 bool PointParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) {
+    Logger::error(QString("PointParameter::addTo(): no grid layout in widget (parameter \"%1\")").arg(_name));
+    return false;
+  }
   _row = row;
-  delete _label;
-  delete _rowCell;
+  delete _label.data();
+  delete _rowCell.data(); // Deletes all the widgets of the row, which are its children
+  _connected = false;     // The connections died with the previous widgets, if any
 
-  _rowCell = new QWidget(widget);
-  auto hbox = new QHBoxLayout(_rowCell);
+  QWidget * rowCell = new QWidget(widget);
+  _rowCell = rowCell;
+  auto hbox = new QHBoxLayout(rowCell);
   hbox->setContentsMargins(0, 0, 0, 0);
-  hbox->addWidget(_colorLabel = new QLabel(_rowCell));
+
+  QLabel * colorLabel = new QLabel(rowCell);
+  _colorLabel = colorLabel;
+  hbox->addWidget(colorLabel);
 
   QFontMetrics fm(widget->font());
   QRect r = fm.boundingRect("CLR");
-  _colorLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-  QPixmap pixmap(r.width(), r.height());
+  colorLabel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+  QPixmap pixmap(std::max(1, r.width()), std::max(1, r.height())); // A null pixmap cannot be painted on
   QPainter painter(&pixmap);
   painter.setBrush(QColor(_color.red(), _color.green(), _color.blue()));
   painter.setPen(Qt::black);
   painter.drawRect(0, 0, pixmap.width() - 1, pixmap.height() - 1);
-  _colorLabel->setPixmap(pixmap);
+  painter.end();
+  colorLabel->setPixmap(pixmap);
 
-  hbox->addWidget(_labelX = new QLabel("X", _rowCell));
-  hbox->addWidget(_spinBoxX = new QDoubleSpinBox(_rowCell));
-  hbox->addWidget(_labelY = new QLabel("Y", _rowCell));
-  hbox->addWidget(_spinBoxY = new QDoubleSpinBox(_rowCell));
+  QLabel * labelX = new QLabel("X", rowCell);
+  _labelX = labelX;
+  hbox->addWidget(labelX);
+  QDoubleSpinBox * spinBoxX = new QDoubleSpinBox(rowCell);
+  _spinBoxX = spinBoxX;
+  hbox->addWidget(spinBoxX);
+  QLabel * labelY = new QLabel("Y", rowCell);
+  _labelY = labelY;
+  hbox->addWidget(labelY);
+  QDoubleSpinBox * spinBoxY = new QDoubleSpinBox(rowCell);
+  _spinBoxY = spinBoxY;
+  hbox->addWidget(spinBoxY);
   if (_removable) {
-    hbox->addWidget(_removeButton = new QToolButton(_rowCell));
-    _removeButton->setCheckable(true);
-    _removeButton->setChecked(_removed);
-    _removeButton->setIcon(Settings::RemoveIcon);
-  } else {
-    _removeButton = nullptr;
+    QToolButton * removeButton = new QToolButton(rowCell);
+    _removeButton = removeButton;
+    hbox->addWidget(removeButton);
+    removeButton->setCheckable(true);
+    removeButton->setChecked(_removed);
+    removeButton->setIcon(Settings::RemoveIcon);
   }
   hbox->addSpacerItem(new QSpacerItem(1, 1, QSizePolicy::Expanding, QSizePolicy::Fixed));
-  _spinBoxX->setRange(-200.0, 300.0);
-  _spinBoxY->setRange(-200.0, 300.0);
-  _spinBoxX->setValue(_position.x());
-  _spinBoxY->setValue(_position.y());
-  _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
-  setTextSelectable(_label);
-  _grid->addWidget(_rowCell, row, 1, 1, 2);
+  spinBoxX->setRange(-200.0, 300.0);
+  spinBoxY->setRange(-200.0, 300.0);
+  spinBoxX->setValue(_position.x());
+  spinBoxY->setValue(_position.y());
+  QLabel * label = new QLabel(_name, widget);
+  _label = label;
+  _grid->addWidget(label, row, 0, 1, 1);
+  setTextSelectable(label);
+  _grid->addWidget(rowCell, row, 1, 1, 2);
 
 #ifdef _GMIC_QT_DEBUG_
-  _label->setToolTip(QString("Burst: %1").arg(_burst ? "on" : "off"));
+  label->setToolTip(QString("Burst: %1").arg(_burst ? "on" : "off"));
 #endif
 
   setRemoved(_removed);
@@ -145,13 +188,16 @@ void PointParameter::addToKeypointList(KeypointList & list) const
 
 void PointParameter::extractPositionFromKeypointList(KeypointList & list)
 {
-  Q_ASSERT_X(!list.isEmpty(), __PRETTY_FUNCTION__, "Keypoint list is empty");
+  Q_ASSERT_X(!list.isEmpty(), Q_FUNC_INFO, "Keypoint list is empty");
+  if (list.isEmpty()) {
+    return; // front() would be undefined
+  }
   enableNotifications(false);
   KeypointList::Keypoint kp = list.front();
   if (!kp.isNaN()) {
     _position.setX(kp.x);
     _position.setY(kp.y);
-    if (_spinBoxX) {
+    if (_spinBoxX && _spinBoxY) {
       _spinBoxX->setValue(kp.x);
       _spinBoxY->setValue(kp.y);
     }
@@ -175,23 +221,26 @@ QString PointParameter::defaultValue() const
 
 void PointParameter::setValue(const QString & value)
 {
-  QStringList list = value.split(",");
-  if (list.size() == 2) {
-    bool ok;
-    float x = list[0].toFloat(&ok);
-    bool xNaN = (list[0].toUpper() == "NAN");
-    if (ok && !xNaN) {
-      _position.setX(x);
-    }
-    float y = list[1].toFloat(&ok);
-    bool yNaN = (list[1].toUpper() == "NAN");
-    if (ok && !yNaN) {
-      _position.setY(y);
-    }
-    _removed = (_removable && xNaN && yNaN);
-
-    updateView();
+  const QStringList list = value.split(",");
+  if (list.size() != 2) {
+    Logger::warning(QString("PointParameter::setValue(\"%1\"): bad value (parameter \"%2\")").arg(value, _name));
+    return;
   }
+  float x = 0.0f;
+  float y = 0.0f;
+  bool xNaN = false;
+  bool yNaN = false;
+  const bool xOk = parseCoordinate(list[0], x, xNaN);
+  const bool yOk = parseCoordinate(list[1], y, yNaN);
+  if (xOk && !xNaN) {
+    _position.setX(x);
+  }
+  if (yOk && !yNaN) {
+    _position.setY(y);
+  }
+  _removed = (_removable && xNaN && yNaN);
+
+  updateView();
 }
 
 void PointParameter::setVisibilityState(AbstractParameter::VisibilityState state)
@@ -204,7 +253,7 @@ void PointParameter::setVisibilityState(AbstractParameter::VisibilityState state
 
 void PointParameter::updateView()
 {
-  if (!_spinBoxX) {
+  if (!_spinBoxX || !_spinBoxY) {
     return;
   }
   disconnectSpinboxes();
@@ -223,9 +272,9 @@ void PointParameter::reset()
 {
   _position = _defaultPosition;
   enableNotifications(false);
-  if (_spinBoxX) {
-    _spinBoxX->setValue(_defaultPosition.rx());
-    _spinBoxY->setValue(_defaultPosition.ry());
+  if (_spinBoxX && _spinBoxY) {
+    _spinBoxX->setValue(_defaultPosition.x());
+    _spinBoxY->setValue(_defaultPosition.y());
   }
   if (_removeButton && _removable) {
     _removeButton->setChecked((_removed = _defaultRemovedStatus));
@@ -237,10 +286,10 @@ void PointParameter::randomize()
 {
   if (acceptRandom()) {
     _position = QPointF(randomReal(0.0, 100.0), randomReal(0.0, 100.0));
-    if (_spinBoxX) {
+    if (_spinBoxX && _spinBoxY) {
       disconnectSpinboxes();
-      _spinBoxX->setValue(_position.rx());
-      _spinBoxY->setValue(_position.ry());
+      _spinBoxX->setValue(_position.x());
+      _spinBoxY->setValue(_position.y());
       connectSpinboxes();
     }
   }
@@ -250,7 +299,7 @@ void PointParameter::randomize()
 bool PointParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("point", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
@@ -270,24 +319,20 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
   bool yNaN = true;
 
   if (!params.isEmpty()) {
-    x = params[0].toFloat(&ok);
-    xNaN = (params[0].toUpper() == "NAN");
-    if (!ok) {
+    if (!parseCoordinate(params[0], x, xNaN)) {
       return false;
     }
     if (xNaN) {
-      x = 50.0;
+      x = 50.0f;
     }
   }
 
   if (params.size() >= 2) {
-    y = params[1].toFloat(&ok);
-    yNaN = (params[1].toUpper() == "NAN");
-    if (!ok) {
+    if (!parseCoordinate(params[1], y, yNaN)) {
       return false;
     }
     if (yNaN) {
-      y = 50.0;
+      y = 50.0f;
     }
   }
 
@@ -317,64 +362,69 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
   }
 
   if (params.size() >= 4) {
-    bool burst = params[3].toInt(&ok);
+    const int burst = params[3].toInt(&ok);
     if (!ok) {
       return false;
     }
-    _burst = burst;
+    _burst = (burst != 0);
   }
 
   if (params.size() >= 5) {
-    int red = params[4].toInt(&ok);
+    const int red = params[4].toInt(&ok);
     if (!ok) {
       return false;
     }
-    _color.setRed(red);
-    _color.setGreen(red);
-    _color.setBlue(red);
+    const int gray = clampedChannel(red);
+    _color.setRed(gray);
+    _color.setGreen(gray);
+    _color.setBlue(gray);
   } else {
     pickColorFromDefaultColormap();
   }
 
   if (params.size() >= 6) {
-    int green = params[5].toInt(&ok);
+    const int green = params[5].toInt(&ok);
     if (!ok) {
       return false;
     }
-    _color.setGreen(green);
+    _color.setGreen(clampedChannel(green));
     _color.setBlue(0);
   }
 
   if (params.size() >= 7) {
-    int blue = params[6].toInt(&ok);
+    const int blue = params[6].toInt(&ok);
     if (!ok) {
       return false;
     }
-    _color.setBlue(blue);
+    _color.setBlue(clampedChannel(blue));
   }
 
   if (params.size() >= 8) {
-    int alpha = params[7].toInt(&ok);
+    const int alpha = params[7].toInt(&ok);
     if (!ok) {
       return false;
     }
     if (params[7].trimmed().startsWith("-") || (alpha < 0)) {
       _keepOpacityWhenSelected = true;
     }
-    _color.setAlpha(std::abs(alpha));
+    // Computed on a wider type: std::abs(INT_MIN) is undefined
+    const long long magnitude = std::llabs(static_cast<long long>(alpha));
+    _color.setAlpha(static_cast<int>(std::min(magnitude, 255ll)));
   }
 
   if (params.size() >= 9) {
     QString s = params[8].trimmed();
-    if (s.endsWith("%")) {
+    const bool isPercentage = s.endsWith("%");
+    if (isPercentage) {
       s.chop(1);
-      _radius = -s.toFloat(&ok);
-    } else {
-      _radius = s.toFloat(&ok);
     }
-    if (!ok) {
+    const float radius = s.toFloat(&ok);
+    if (!ok || !std::isfinite(radius)) {
       return false;
     }
+    // Keypoint::actualRadiusFromPreviewSize() converts the radius to an int: keep it reasonable.
+    const float signedRadius = isPercentage ? -radius : radius;
+    _radius = std::max(-1000.0f, std::min(10000.0f, signedRadius));
   }
 
   _position = _defaultPosition;
@@ -388,6 +438,9 @@ void PointParameter::enableNotifications(bool on)
 
 void PointParameter::onSpinBoxChanged()
 {
+  if (!_spinBoxX || !_spinBoxY) {
+    return;
+  }
   _position = QPointF(_spinBoxX->value(), _spinBoxY->value());
   if (_notificationEnabled) {
     notifyIfRelevant();
@@ -399,12 +452,18 @@ void PointParameter::setRemoved(bool on)
   _removed = on;
   if (_spinBoxX) {
     _spinBoxX->setDisabled(on);
+  }
+  if (_spinBoxY) {
     _spinBoxY->setDisabled(on);
+  }
+  if (_labelX) {
     _labelX->setDisabled(on);
+  }
+  if (_labelY) {
     _labelY->setDisabled(on);
-    if (_removeButton) {
-      _removeButton->setIcon(on ? Settings::AddIcon : Settings::RemoveIcon);
-    }
+  }
+  if (_removeButton) {
+    _removeButton->setIcon(on ? Settings::AddIcon : Settings::RemoveIcon);
   }
 }
 
@@ -429,28 +488,31 @@ int PointParameter::randomChannel()
 
 void PointParameter::connectSpinboxes()
 {
-  if (_connected || !_spinBoxX) {
+  if (_connected || !_spinBoxX || !_spinBoxY) {
     return;
   }
-  connect(_spinBoxX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &PointParameter::onSpinBoxChanged);
-  connect(_spinBoxY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &PointParameter::onSpinBoxChanged);
+  connect(_spinBoxX.data(), QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &PointParameter::onSpinBoxChanged);
+  connect(_spinBoxY.data(), QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &PointParameter::onSpinBoxChanged);
   if (_removable && _removeButton) {
-    connect(_removeButton, &QToolButton::toggled, this, &PointParameter::onRemoveButtonToggled);
+    connect(_removeButton.data(), &QToolButton::toggled, this, &PointParameter::onRemoveButtonToggled);
   }
   _connected = true;
 }
 
 void PointParameter::disconnectSpinboxes()
 {
-  if (!_connected || !_spinBoxX) {
+  if (!_connected) {
     return;
+  }
+  _connected = false;
+  if (!_spinBoxX || !_spinBoxY) {
+    return; // The widgets (and their connections) are gone
   }
   _spinBoxX->disconnect(this);
   _spinBoxY->disconnect(this);
   if (_removable && _removeButton) {
     _removeButton->disconnect(this);
   }
-  _connected = false;
 }
 
 void PointParameter::pickColorFromDefaultColormap()
@@ -477,10 +539,18 @@ void PointParameter::pickColorFromDefaultColormap()
   case 6:
     _color = Qt::yellow;
     break;
-  default:
-    _color.setRgb(randomChannel(), randomChannel(), randomChannel());
+  default: {
+    // The evaluation order of function arguments is unspecified: using three successive
+    // calls in the setRgb() arguments gave different colors depending on the compiler.
+    const int red = randomChannel();
+    const int green = randomChannel();
+    const int blue = randomChannel();
+    _color.setRgb(red, green, blue);
+  }
   }
   ++_defaultColorNextIndex;
 }
 
 } // namespace GmicQt
+
+

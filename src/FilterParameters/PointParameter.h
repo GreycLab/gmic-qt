@@ -28,8 +28,10 @@
 #include <QColor>
 #include <QColorDialog>
 #include <QDoubleSpinBox>
+#include <QLabel>
 #include <QPixmap>
 #include <QPointF>
+#include <QPointer>
 #include <QString>
 #include <QToolButton>
 #include "AbstractParameter.h"
@@ -76,26 +78,27 @@ private:
   void pickColorFromDefaultColormap();
   void updateView();
   QString _name;
-  QPointF _defaultPosition;
-  bool _defaultRemovedStatus;
-  QPointF _position;
+  QPointF _defaultPosition = QPointF(0, 0);
+  bool _defaultRemovedStatus = false;
+  QPointF _position = QPointF(0, 0);
   QColor _color;
-  bool _removable;
-  bool _burst;
-  float _radius;
-  bool _keepOpacityWhenSelected;
+  bool _removable = false;
+  bool _burst = false;
+  float _radius = 0.0f;
+  bool _keepOpacityWhenSelected = false;
 
-  QLabel * _label;
-  QLabel * _colorLabel;
-  QLabel * _labelX;
-  QLabel * _labelY;
-  QDoubleSpinBox * _spinBoxX;
-  QDoubleSpinBox * _spinBoxY;
-  QToolButton * _removeButton;
-  bool _connected;
-  bool _removed;
-  QWidget * _rowCell;
-  bool _notificationEnabled;
+  // Guarded pointers: the widgets are children of the parameters widget, which may delete them first.
+  QPointer<QLabel> _label;
+  QPointer<QLabel> _colorLabel;
+  QPointer<QLabel> _labelX;
+  QPointer<QLabel> _labelY;
+  QPointer<QDoubleSpinBox> _spinBoxX;
+  QPointer<QDoubleSpinBox> _spinBoxY;
+  QPointer<QToolButton> _removeButton;
+  bool _connected = false;
+  bool _removed = false;
+  QPointer<QWidget> _rowCell;
+  bool _notificationEnabled = true;
   static int _defaultColorNextIndex;
   static unsigned long _randomSeed;
 };
@@ -103,3 +106,5 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_POINTPARAMETER_H
+
+
