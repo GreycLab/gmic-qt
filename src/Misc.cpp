@@ -154,7 +154,7 @@ bool parseGmicFilterParameters(const char * text, QStringList & args)
   bool quoted = false;
   bool escaped = false;
   bool meaningfulSpaceFound = false;
-  char * buffer = new char[strlen(pc) + 1]();
+  char * buffer = new char[strlen(pc) + 1](); // +1 : room for the terminating '\0'
   char * output = buffer;
   while (*pc && !((meaningfulSpaceFound = (!quoted && !escaped && isspace(*pc))))) {
     if (escaped) {
@@ -328,6 +328,10 @@ QStringList mergeSubsequences(const QStringList & sequence, const QVector<int> &
     QString text = *itInput++;
     --(*itLength);
     while (*itLength > 0) {
+      if (itInput == sequence.constEnd()) {
+        Logger::warning(QObject::tr("List %1 cannot be merged considering these runs: %2").arg(stringify(sequence)).arg(stringify(subSequenceLengths)));
+        return QStringList();
+      }
       text += QString(",%1").arg(*itInput++);
       --(*itLength);
     }
