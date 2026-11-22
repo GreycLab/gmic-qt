@@ -27,6 +27,9 @@
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QScreen>
+#include <algorithm>
+#include <limits>
+#include "Common.h"
 #include "GmicProcessor.h"
 #include "IconLoader.h"
 #include "Misc.h"
@@ -37,6 +40,86 @@
 #include <process.h>
 #include <psapi.h>
 #endif
+
+namespace
+{
+
+#if defined(_IS_UNIX_)
+/**
+ * Looks for the "VmRSS:" entry of the content of /proc/self/status and reads the (unsigned)
+ * number which follows. Works on a bounded buffer, and reports any failure.
+ *
+ * This replaces strstr() + sscanf(str + 7, "%llu", ...) where
+ *  - sscanf() returns EOF (a non-zero value) when no number is found, so that an uninitialized
+ *    variable was then used as a memory size;
+ *  - "str + 7" could point past the end of the buffer if "VmRSS:" was its last characters.
+ */
+bool parseVmRssKiB(const char * text, const int size, quint64 & kiB)
+{
+  static const char key[] = "VmRSS:";
+  const int keyLength = static_cast<int>(sizeof(key)) - 1;
+  if (!text || (size < keyLength)) {
+    return false;
+  }
+  const char * const end = text + size;
+  const char * found = std::search(text, end, key, key + keyLength);
+  if (found == end) {
+    return false;
+  }
+  const char * p = found + keyLength;
+  while ((p != end) && ((*p == ' ') || (*p == '\t'))) {
+    ++p;
+  }
+  const char * const digits = p;
+  quint64 value = 0;
+  while ((p != end) && (*p >= '0') && (*p <= '9')) {
+    const unsigned int digit = static_cast<unsigned int>(*p - '0');
+    if (value > (std::numeric_limits<quint64>::max() - digit) / 10) {
+      return false; // Overflow
+    }
+    value = value * 10 + digit;
+    ++p;
+  }
+  if (p == digits) {
+    return false;
+  }
+  kiB = value;
+  return true;
+}
+#endif
+
+#if defined(_IS_UNIX_) || defined(_IS_WINDOWS_)
+/**
+ * Memory currently used by the process, in bytes.
+ * @return false if the information is not available.
+ */
+bool processMemoryUsage(quint64 & bytes)
+{
+#if defined(_IS_UNIX_)
+  QFile status("/proc/self/status");
+  if (!status.open(QFile::ReadOnly)) {
+    return false;
+  }
+  const QByteArray text = status.readAll();
+  quint64 kiB = 0;
+  if (!parseVmRssKiB(text.constData(), text.size(), kiB) || (kiB > std::numeric_limits<quint64>::max() / 1024)) {
+    return false;
+  }
+  bytes = kiB * 1024;
+  return true;
+#else // _IS_WINDOWS_
+  PROCESS_MEMORY_COUNTERS counters = {};
+  counters.cb = sizeof(counters);
+  if (!GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
+    return false;
+  }
+  bytes = static_cast<quint64>(counters.WorkingSetSize);
+  return true;
+#endif
+}
+#endif
+
+} // namespace
 
 namespace GmicQt
 {
@@ -128,7 +211,11 @@ void ProgressInfoWidget::startFilterThreadAnimationAndShow()
   QString largestText(tr("[Processing 88:00:00.888]"));
 #endif
   QFontMetrics fm(ui->label->font());
+#if QT_VERSION_GTE(5, 11, 0)
   ui->label->setMinimumWidth(fm.horizontalAdvance(largestText));
+#else
+  ui->label->setMinimumWidth(fm.width(largestText));
+#endif
 
   _canceled = false;
   _mode = Mode::GmicProcessing;
@@ -180,12 +267,17 @@ void ProgressInfoWidget::showBusyIndicator()
 
 void ProgressInfoWidget::updateThreadInformation()
 {
+  if (!_gmicProcessor) {
+    // The timer may fire before setGmicProcessor() has been called.
+    return;
+  }
   int ms = _gmicProcessor->duration();
   float progress = _gmicProcessor->progress();
   if (progress >= 0) {
     ui->progressBar->setInvertedAppearance(false);
     ui->progressBar->setTextVisible(true);
-    ui->progressBar->setValue((int)progress);
+    // Bounded before the conversion: casting a float which is out of the range of int is undefined.
+    ui->progressBar->setValue(static_cast<int>(std::min(progress, 100.0f)));
   } else {
     ui->progressBar->setTextVisible(false);
     int value = ui->progressBar->value();
@@ -198,26 +290,9 @@ void ProgressInfoWidget::updateThreadInformation()
     }
   }
   QString durationStr = readableDuration(ms);
-#ifdef _IS_UNIX_
-  // Get memory usage
-  QString memoryStr("? KiB");
-  QFile status("/proc/self/status");
-  if (status.open(QFile::ReadOnly)) {
-    QByteArray text = status.readAll();
-    const char * str = strstr(text.constData(), "VmRSS:");
-    quint64 kiB;
-    if (str && sscanf(str + 7, "%llu", &kiB)) {
-      memoryStr = readableSize(kiB * 1024);
-    }
-  }
-  ui->label->setText(QString(tr("[Processing %1 | %2]")).arg(durationStr).arg(memoryStr));
-#elif defined(_IS_WINDOWS_)
-  PROCESS_MEMORY_COUNTERS counters;
-  quint64 kiB = 0;
-  if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
-    kiB = static_cast<quint64>(counters.WorkingSetSize / 1024);
-  }
-  QString memoryStr = readableSize(kiB * 1024);
+#if defined(_IS_UNIX_) || defined(_IS_WINDOWS_)
+  quint64 memoryBytes = 0;
+  const QString memoryStr = processMemoryUsage(memoryBytes) ? readableSize(memoryBytes) : QString("? KiB");
   ui->label->setText(QString(tr("[Processing %1 | %2]")).arg(durationStr).arg(memoryStr));
 #else
   ui->label->setText(QString(tr("[Processing %1]")).arg(durationStr));
