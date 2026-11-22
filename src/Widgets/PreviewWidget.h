@@ -34,6 +34,7 @@
 #include <QRectF>
 #include <QSize>
 #include <QWidget>
+#include <memory>
 #include "Host/GmicQtHost.h"
 #include "KeypointList.h"
 #include "ZoomConstraint.h"
@@ -166,7 +167,8 @@ private:
   void paintPreviewSplitter(QPainter & painter);
 
   void paintKeypoints(QPainter & painter);
-  int keypointUnderMouse(const QPoint & p);
+  int keypointUnderMouse(const QPoint & p) const;
+  bool isValidKeypointIndex(int index) const;
   QPoint keypointToPointInWidget(const KeypointList::Keypoint & kp) const;
   QPoint keypointToVisiblePointInWidget(const KeypointList::Keypoint & kp) const;
   QPointF pointInWidgetToKeypointPosition(const QPoint &) const;
@@ -178,12 +180,30 @@ private:
     Y = 2,
     XY = 3
   };
-  DraggingMode splitterDraggingModeFromMousePosition(const QPoint & p);
+  DraggingMode splitterDraggingModeFromMousePosition(const QPoint & p) const;
 
   QSize originalImageCropSize();
   void saveVisibleCenter();
-  gmic_library::gmic_image<float> * _image;
-  gmic_library::gmic_image<float> * _savedPreview;
+
+  /**
+   * @brief True if the size of the full image is known (strictly positive width and height).
+   *        Every division by the full image size is guarded by this test.
+   */
+  bool hasFullImage() const;
+
+  /**
+   * @brief Zoom factor making the full image fit in a given area (1.0 if the
+   *        full image size is unknown or if the area is empty).
+   */
+  double fullImageZoomFactor(int availableWidth, int availableHeight) const;
+
+  /**
+   * @brief Forget the cached QImage of the (resized) preview. Must be called each time *_image changes.
+   */
+  void invalidatePreviewQImage();
+
+  std::unique_ptr<gmic_library::gmic_image<float>> _image;
+  std::unique_ptr<gmic_library::gmic_image<float>> _savedPreview;
   QSize _fullImageSize;
   double _currentZoomFactor;
   ZoomConstraint _zoomConstraint;
@@ -232,7 +252,6 @@ private:
   bool _savedPreviewIsValid;
   QRect _imagePosition;
   QPoint _mousePosition;
-  QPixmap _transparentBackground;
   bool _paintOriginalImage;
   QSize _originalImageSize;
   QSize _originalImageScaledSize;
@@ -240,6 +259,9 @@ private:
   QString _errorMessage;
   QString _overlayMessage;
   QImage _errorImage;
+  QImage _previewQImage; // Cache: preview image resized to _imagePosition and converted for display
+  QSize _previewQImageSize;
+  bool _previewQImageIsValid;
   KeypointList _keypoints;
   int _movedKeypointIndex;
   QPoint _movedKeypointOrigin;
@@ -256,3 +278,5 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_PREVIEWWIDGET_H
+
+
