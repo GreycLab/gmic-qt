@@ -32,8 +32,14 @@
 #include <QString>
 #include <QThread>
 #include <QTimer>
+#include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <vector>
 #include "Common.h"
 #include "Globals.h"
 #include "HeadlessProcessor.h"
@@ -63,9 +69,103 @@ inline bool archIsLittleEndian()
   return (*reinterpret_cast<const unsigned char *>(&x));
 }
 
+// Converting a NaN, or a value which is out of range, from float to an integer type is
+// undefined behavior: the negated comparison below also maps NaN to 0.
 inline unsigned char float2uchar_bounded(const float & in)
 {
-  return (in < 0.0f) ? 0 : ((in > 255.0f) ? 255 : static_cast<unsigned char>(in));
+  return !(in > 0.0f) ? 0 : ((in >= 255.0f) ? 255 : static_cast<unsigned char>(in));
+}
+
+// Values read from the settings may be corrupted or come from another version of the plug-in:
+// never cast them blindly to an enumeration.
+GmicQt::InputMode inputModeFromInt(const int value, const GmicQt::InputMode fallback)
+{
+  switch (value) {
+  case static_cast<int>(GmicQt::InputMode::NoInput):
+  case static_cast<int>(GmicQt::InputMode::Active):
+  case static_cast<int>(GmicQt::InputMode::All):
+  case static_cast<int>(GmicQt::InputMode::ActiveAndBelow):
+  case static_cast<int>(GmicQt::InputMode::ActiveAndAbove):
+  case static_cast<int>(GmicQt::InputMode::AllVisible):
+  case static_cast<int>(GmicQt::InputMode::AllInvisible):
+  case static_cast<int>(GmicQt::InputMode::AllVisiblesDesc_DEPRECATED):
+  case static_cast<int>(GmicQt::InputMode::AllInvisiblesDesc_DEPRECATED):
+  case static_cast<int>(GmicQt::InputMode::AllDesc_DEPRECATED):
+  case static_cast<int>(GmicQt::InputMode::Unspecified):
+    return static_cast<GmicQt::InputMode>(value);
+  default:
+    return fallback;
+  }
+}
+
+GmicQt::OutputMode outputModeFromInt(const int value, const GmicQt::OutputMode fallback)
+{
+  switch (value) {
+  case static_cast<int>(GmicQt::OutputMode::InPlace):
+  case static_cast<int>(GmicQt::OutputMode::NewLayers):
+  case static_cast<int>(GmicQt::OutputMode::NewActiveLayers):
+  case static_cast<int>(GmicQt::OutputMode::NewImage):
+  case static_cast<int>(GmicQt::OutputMode::Unspecified):
+    return static_cast<GmicQt::OutputMode>(value);
+  default:
+    return fallback;
+  }
+}
+
+// Pixel value of the checkerboard (96 or 160) displayed behind transparent areas of a preview.
+inline unsigned int checkerboardValue(const int x, const int y)
+{
+  return 96 + (((x ^ y) & 8) << 3);
+}
+
+template <typename T> //
+inline unsigned int alphaValue(const T alpha)
+{
+  // Bounded to [0,255]: 255 - alpha used to wrap around for an alpha value above 255.
+  return float2uchar_bounded(static_cast<float>(alpha));
+}
+
+// Blends the first `colorChannels` channels of img over a checkerboard, according to the
+// alpha channel `alphaChannel` (only the first slice is processed, as it used to be).
+// This replaces five copies of the same loop.
+template <typename T> //
+void blendOnCheckerboard(gmic_library::gmic_image<T> & img, const unsigned int alphaChannel, const unsigned int colorChannels)
+{
+  const int w = img.width();
+  const int h = img.height();
+  for (unsigned int c = 0; c < colorChannels; ++c) {
+    T * color = img.data(0, 0, 0, c);
+    const T * alpha = img.data(0, 0, 0, alphaChannel);
+    for (int y = 0; y < h; ++y) {
+      for (int x = 0; x < w; ++x) {
+        const unsigned int a = alphaValue(*alpha++);
+        *color = static_cast<T>((a * static_cast<unsigned int>(*color) + (255 - a) * checkerboardValue(x, y)) >> 8);
+        ++color;
+      }
+    }
+  }
+}
+
+template <typename T> //
+struct AverageAccumulator {
+  typedef typename std::conditional<std::is_floating_point<T>::value, T, long long>::type type;
+};
+
+// Stores (R + G + B) / 3 in the first channel.
+// The previous implementation, (c0 += c1 += c2) /= 3, accumulated in the pixel type itself:
+// it wrapped around with 8-bit pixels (e.g. 200,100,100 gave 48 instead of 133).
+// It also modified the second channel as a side effect.
+template <typename T> //
+void averageRgbIntoFirstChannel(gmic_library::gmic_image<T> & img)
+{
+  typedef typename AverageAccumulator<T>::type Accumulator;
+  T * r = img.data(0, 0, 0, 0);
+  const T * g = img.data(0, 0, 0, 1);
+  const T * b = img.data(0, 0, 0, 2);
+  const size_t count = static_cast<size_t>(img.width()) * static_cast<size_t>(img.height()) * static_cast<size_t>(img.depth());
+  for (size_t i = 0; i < count; ++i) {
+    r[i] = static_cast<T>((static_cast<Accumulator>(r[i]) + (static_cast<Accumulator>(g[i]) + static_cast<Accumulator>(b[i]))) / 3);
+  }
 }
 
 } // namespace
@@ -88,20 +188,21 @@ RunParameters lastAppliedFilterRunParameters(ReturnedRunParametersFlag flag)
   configureApplication();
   RunParameters parameters;
   QSettings settings;
-  const QString path = settings.value(QString("LastExecution/host_%1/FilterPath").arg(GmicQtHost::ApplicationShortname)).toString();
+  const QString keyPrefix = QString("LastExecution/host_%1/").arg(GmicQtHost::ApplicationShortname);
+  const QString path = settings.value(keyPrefix + "FilterPath").toString();
   parameters.filterPath = path.toStdString();
-  QString args = settings.value(QString("LastExecution/host_%1/Arguments").arg(GmicQtHost::ApplicationShortname)).toString();
+  QString args = settings.value(keyPrefix + "Arguments").toString();
   if (flag == ReturnedRunParametersFlag::AfterFilterExecution) {
-    QString lastAppliedCommandGmicStatus = settings.value(QString("LastExecution/host_%1/GmicStatusString").arg(GmicQtHost::ApplicationShortname)).toString();
+    QString lastAppliedCommandGmicStatus = settings.value(keyPrefix + "GmicStatusString").toString();
     if (!lastAppliedCommandGmicStatus.isEmpty()) {
       args = lastAppliedCommandGmicStatus;
     }
   }
-  QString command = settings.value(QString("LastExecution/host_%1/Command").arg(GmicQtHost::ApplicationShortname)).toString();
+  QString command = settings.value(keyPrefix + "Command").toString();
   appendWithSpace(command, args);
   parameters.command = command.toStdString();
-  parameters.inputMode = (InputMode)settings.value(QString("LastExecution/host_%1/InputMode").arg(GmicQtHost::ApplicationShortname), (int)InputMode::Active).toInt();
-  parameters.outputMode = (OutputMode)settings.value(QString("LastExecution/host_%1/OutputMode").arg(GmicQtHost::ApplicationShortname), (int)OutputMode::InPlace).toInt();
+  parameters.inputMode = inputModeFromInt(settings.value(keyPrefix + "InputMode", (int)InputMode::Active).toInt(), InputMode::Active);
+  parameters.outputMode = outputModeFromInt(settings.value(keyPrefix + "OutputMode", (int)OutputMode::InPlace).toInt(), OutputMode::InPlace);
   return parameters;
 }
 
@@ -111,6 +212,9 @@ int run(UserInterfaceMode interfaceMode,                   //
         const std::list<OutputMode> & disabledOutputModes, //
         bool * dialogWasAccepted)
 {
+  // The output parameter has a defined value on every code path.
+  setValueIfNotNullPointer(dialogWasAccepted, false);
+
   int dummy_argc = 1;
   char dummy_app_name[] = GMIC_QT_APPLICATION_NAME;
 
@@ -118,6 +222,9 @@ int run(UserInterfaceMode interfaceMode,                   //
   SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
 #endif
 
+  // Owns the buffer returned by realpath(), which must outlive the QCoreApplication instance
+  // (Qt keeps a pointer to argv). It was never freed.
+  std::unique_ptr<char, decltype(&std::free)> executableFullPath(nullptr, &std::free);
   char * fullexname = nullptr;
 #ifdef _IS_MACOS_
   {
@@ -126,22 +233,30 @@ int run(UserInterfaceMode interfaceMode,                   //
     uint32_t size = sizeof(exname);
     if (_NSGetExecutablePath(exname, &size) == 0) {
       printf("Executable path is [%s]\n", exname);
-      fullexname = realpath(exname, nullptr);
-      printf("Full executable name is [%s]\n", fullexname);
-      if (fullexname) {
-        char * fullpath = dirname(fullexname);
-        printf("Full executable path is [%s]\n", fullpath);
-        if (fullpath) {
-          char pluginpath[2048] = {0};
-          strncpy(pluginpath, fullpath, 2047);
-          strncat(pluginpath, "/GMIC/plugins/:", 2047);
-          char * envpath = getenv("QT_PLUGIN_PATH");
-          if (envpath) {
-            strncat(pluginpath, envpath, 2047);
+      executableFullPath.reset(realpath(exname, nullptr));
+      if (executableFullPath) {
+        fullexname = executableFullPath.get();
+        printf("Full executable name is [%s]\n", fullexname);
+        // dirname() may modify its argument and/or return a pointer to static storage:
+        // work on a copy, so that fullexname (used as argv[0]) is left untouched.
+        std::vector<char> pathCopy(fullexname, fullexname + std::strlen(fullexname) + 1);
+        const char * directory = dirname(pathCopy.data());
+        if (directory) {
+          printf("Full executable path is [%s]\n", directory);
+          // std::string instead of a fixed 2048 bytes buffer: the former strncat() calls bounded the
+          // number of appended characters, not the buffer size, and could overflow it.
+          std::string pluginPath = std::string(directory) + "/GMIC/plugins/";
+          const char * envPath = getenv("QT_PLUGIN_PATH");
+          if (envPath && *envPath) {
+            // No empty (i.e. "current folder") entry is appended when QT_PLUGIN_PATH is unset.
+            pluginPath += ':';
+            pluginPath += envPath;
           }
-          printf("Plugins path is [%s]\n", pluginpath);
-          setenv("QT_PLUGIN_PATH", pluginpath, 1);
+          printf("Plugins path is [%s]\n", pluginPath.c_str());
+          setenv("QT_PLUGIN_PATH", pluginPath.c_str(), 1);
         }
+      } else {
+        fprintf(stderr, "Could not resolve the executable path [%s]\n", exname);
       }
     } else {
       fprintf(stderr, "Buffer too small; need size %u\n", size);
@@ -211,11 +326,11 @@ int run(UserInterfaceMode interfaceMode,                   //
 
 std::string RunParameters::filterName() const
 {
-  auto position = filterPath.rfind("/");
+  const auto position = filterPath.rfind('/');
   if (position == std::string::npos) {
     return filterPath;
   }
-  return filterPath.substr(position + 1, filterPath.length() - (position + 1));
+  return filterPath.substr(position + 1);
 }
 
 template <typename T> //
@@ -231,30 +346,18 @@ void calibrateImage(gmic_library::gmic_image<T> & img, const int spectrum, const
       break;
     case 2: // from GRAYA
       if (isPreview) {
-        T *ptr_r = img.data(0, 0, 0, 0), *ptr_a = img.data(0, 0, 0, 1);
-        cimg_forXY(img, x, y)
-        {
-          const unsigned int a = (unsigned int)*(ptr_a++), i = 96 + (((x ^ y) & 8) << 3);
-          *ptr_r = (T)((a * (unsigned int)*ptr_r + (255 - a) * i) >> 8);
-          ++ptr_r;
-        }
+        blendOnCheckerboard(img, 1, 1);
       }
       img.channel(0);
       break;
     case 3: // from RGB
-      (img.get_shared_channel(0) += img.get_shared_channel(1) += img.get_shared_channel(2)) /= 3;
+      averageRgbIntoFirstChannel(img);
       img.channel(0);
       break;
     case 4: // from RGBA
-      (img.get_shared_channel(0) += img.get_shared_channel(1) += img.get_shared_channel(2)) /= 3;
+      averageRgbIntoFirstChannel(img);
       if (isPreview) {
-        T *ptr_r = img.data(0, 0, 0, 0), *ptr_a = img.data(0, 0, 0, 3);
-        cimg_forXY(img, x, y)
-        {
-          const unsigned int a = (unsigned int)*(ptr_a++), i = 96 + (((x ^ y) & 8) << 3);
-          *ptr_r = (T)((a * (unsigned int)*ptr_r + (255 - a) * i) >> 8);
-          ++ptr_r;
-        }
+        blendOnCheckerboard(img, 3, 1);
       }
       img.channel(0);
       break;
@@ -271,11 +374,11 @@ void calibrateImage(gmic_library::gmic_image<T> & img, const int spectrum, const
     case 2: // from GRAYA
       break;
     case 3: // from RGB
-      (img.get_shared_channel(0) += img.get_shared_channel(1) += img.get_shared_channel(2)) /= 3;
+      averageRgbIntoFirstChannel(img);
       img.channels(0, 1).get_shared_channel(1).fill(255);
       break;
     case 4: // from RGBA
-      (img.get_shared_channel(0) += img.get_shared_channel(1) += img.get_shared_channel(2)) /= 3;
+      averageRgbIntoFirstChannel(img);
       img.get_shared_channel(1) = img.get_shared_channel(3);
       img.channels(0, 1);
       break;
@@ -291,13 +394,7 @@ void calibrateImage(gmic_library::gmic_image<T> & img, const int spectrum, const
       break;
     case 2: // from GRAYA
       if (isPreview) {
-        T *ptr_r = img.data(0, 0, 0, 0), *ptr_a = img.data(0, 0, 0, 1);
-        cimg_forXY(img, x, y)
-        {
-          const unsigned int a = (unsigned int)*(ptr_a++), i = 96 + (((x ^ y) & 8) << 3);
-          *ptr_r = (T)((a * (unsigned int)*ptr_r + (255 - a) * i) >> 8);
-          ++ptr_r;
-        }
+        blendOnCheckerboard(img, 1, 1);
       }
       img.channel(0).resize(-100, -100, 1, 3);
       break;
@@ -305,17 +402,7 @@ void calibrateImage(gmic_library::gmic_image<T> & img, const int spectrum, const
       break;
     case 4: // from RGBA
       if (isPreview) {
-        T *ptr_r = img.data(0, 0, 0, 0), *ptr_g = img.data(0, 0, 0, 1), *ptr_b = img.data(0, 0, 0, 2), *ptr_a = img.data(0, 0, 0, 3);
-        cimg_forXY(img, x, y)
-        {
-          const unsigned int a = (unsigned int)*(ptr_a++), i = 96 + (((x ^ y) & 8) << 3);
-          *ptr_r = (T)((a * (unsigned int)*ptr_r + (255 - a) * i) >> 8);
-          *ptr_g = (T)((a * (unsigned int)*ptr_g + (255 - a) * i) >> 8);
-          *ptr_b = (T)((a * (unsigned int)*ptr_b + (255 - a) * i) >> 8);
-          ++ptr_r;
-          ++ptr_g;
-          ++ptr_b;
-        }
+        blendOnCheckerboard(img, 3, 3);
       }
       img.channels(0, 2);
       break;
@@ -352,30 +439,32 @@ template void calibrateImage(gmic_library::gmic_image<unsigned char> & img, cons
 
 void convertGmicImageToQImage(const gmic_library::gmic_image<float> & in, QImage & out)
 {
-  out = QImage(in.width(), in.height(), QImage::Format_RGB888);
-
-  if (in.spectrum() >= 4 && out.format() != QImage::Format_ARGB32) {
-    out = out.convertToFormat(QImage::Format_ARGB32);
+  if (in.is_empty() || (in.width() <= 0) || (in.height() <= 0) || (in.spectrum() <= 0)) {
+    out = QImage();
+    return;
   }
 
-  if (in.spectrum() == 3 && out.format() != QImage::Format_RGB888) {
-    out = out.convertToFormat(QImage::Format_RGB888);
-  }
-
-  if (in.spectrum() == 2 && out.format() != QImage::Format_ARGB32) {
-    out = out.convertToFormat(QImage::Format_ARGB32);
-  }
-
+  // The destination image is created directly with the right format. It used to be created as
+  // RGB888 then converted (one more allocation and one more full copy, for every preview).
+  QImage::Format format;
+  if ((in.spectrum() >= 4) || (in.spectrum() == 2)) {
+    format = QImage::Format_ARGB32;
+  } else if (in.spectrum() == 3) {
+    format = QImage::Format_RGB888;
+  } else {
 // Format_Grayscale8 was added in Qt 5.5.
 #if QT_VERSION_GTE(5, 5, 0)
-  if (in.spectrum() == 1 && out.format() != QImage::Format_Grayscale8) {
-    out = out.convertToFormat(QImage::Format_Grayscale8);
-  }
+    format = QImage::Format_Grayscale8;
 #else
-  if (in.spectrum() == 1) {
-    out = out.convertToFormat(QImage::Format_RGB888);
-  }
+    format = QImage::Format_RGB888;
 #endif
+  }
+  out = QImage(in.width(), in.height(), format);
+  if (out.isNull()) {
+    // Allocation failure (huge image): scanLine() would return a null pointer.
+    Logger::error(QString("convertGmicImageToQImage(): cannot allocate a %1x%2 image").arg(in.width()).arg(in.height()));
+    return;
+  }
 
   if (in.spectrum() >= 4) {
     const float * srcR = in.data(0, 0, 0, 0);
@@ -462,7 +551,8 @@ void convertGmicImageToQImage(const gmic_library::gmic_image<float> & in, QImage
       unsigned char * dst = out.scanLine(y);
 #if QT_VERSION_GTE(5, 5, 0)
       while (n--) {
-        *dst++ = static_cast<unsigned char>(*src++);
+        // Bounded conversion (a plain static_cast is undefined for NaN or out of range values).
+        *dst++ = float2uchar_bounded(*src++);
       }
 #else
       while (n--) {
@@ -479,11 +569,28 @@ void convertGmicImageToQImage(const gmic_library::gmic_image<float> & in, QImage
 
 void convertQImageToGmicImage(const QImage & in, gmic_library::gmic_image<float> & out)
 {
-  Q_ASSERT_X(in.format() == QImage::Format_ARGB32 || in.format() == QImage::Format_RGB888, "convert", "bad input format");
+  if (in.isNull()) {
+    out.assign();
+    return;
+  }
 
-  if (in.format() == QImage::Format_ARGB32) {
-    const int w = in.width();
-    const int h = in.height();
+  // Only ARGB32 and RGB888 are handled below. With any other format, this function used to
+  // do nothing in release builds (the check was a Q_ASSERT_X), leaving `out` unchanged.
+  QImage converted;
+  const QImage * source = &in;
+  if ((in.format() != QImage::Format_ARGB32) && (in.format() != QImage::Format_RGB888)) {
+    converted = in.convertToFormat(in.hasAlphaChannel() ? QImage::Format_ARGB32 : QImage::Format_RGB888);
+    if (converted.isNull()) {
+      out.assign();
+      return;
+    }
+    source = &converted;
+  }
+  const QImage & image = *source;
+
+  if (image.format() == QImage::Format_ARGB32) {
+    const int w = image.width();
+    const int h = image.height();
     out.assign(w, h, 1, 4);
     float * dstR = out.data(0, 0, 0, 0);
     float * dstG = out.data(0, 0, 0, 1);
@@ -491,8 +598,8 @@ void convertQImageToGmicImage(const QImage & in, gmic_library::gmic_image<float>
     float * dstA = out.data(0, 0, 0, 3);
     if (archIsLittleEndian()) {
       for (int y = 0; y < h; ++y) {
-        const unsigned char * src = in.scanLine(y);
-        int n = in.width();
+        const unsigned char * src = image.constScanLine(y);
+        int n = w;
         while (n--) {
           *dstB++ = static_cast<float>(src[0]);
           *dstG++ = static_cast<float>(src[1]);
@@ -503,8 +610,8 @@ void convertQImageToGmicImage(const QImage & in, gmic_library::gmic_image<float>
       }
     } else {
       for (int y = 0; y < h; ++y) {
-        const unsigned char * src = in.scanLine(y);
-        int n = in.width();
+        const unsigned char * src = image.constScanLine(y);
+        int n = w;
         while (n--) {
           *dstA++ = static_cast<float>(src[0]);
           *dstR++ = static_cast<float>(src[1]);
@@ -517,24 +624,22 @@ void convertQImageToGmicImage(const QImage & in, gmic_library::gmic_image<float>
     return;
   }
 
-  if (in.format() == QImage::Format_RGB888) {
-    const int w = in.width();
-    const int h = in.height();
-    out.assign(w, h, 1, 3);
-    float * dstR = out.data(0, 0, 0, 0);
-    float * dstG = out.data(0, 0, 0, 1);
-    float * dstB = out.data(0, 0, 0, 2);
-    for (int y = 0; y < h; ++y) {
-      const unsigned char * src = in.scanLine(y);
-      int n = in.width();
-      while (n--) {
-        *dstR++ = static_cast<float>(src[0]);
-        *dstG++ = static_cast<float>(src[1]);
-        *dstB++ = static_cast<float>(src[2]);
-        src += 3;
-      }
+  // Format_RGB888
+  const int w = image.width();
+  const int h = image.height();
+  out.assign(w, h, 1, 3);
+  float * dstR = out.data(0, 0, 0, 0);
+  float * dstG = out.data(0, 0, 0, 1);
+  float * dstB = out.data(0, 0, 0, 2);
+  for (int y = 0; y < h; ++y) {
+    const unsigned char * src = image.constScanLine(y);
+    int n = w;
+    while (n--) {
+      *dstR++ = static_cast<float>(src[0]);
+      *dstG++ = static_cast<float>(src[1]);
+      *dstB++ = static_cast<float>(src[2]);
+      src += 3;
     }
-    return;
   }
 }
 
