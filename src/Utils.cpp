@@ -29,9 +29,12 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QString>
-#include <QTemporaryFile>
+#include <algorithm>
 #include "Common.h"
 #include "Host/GmicQtHost.h"
 #include "Logger.h"
@@ -39,6 +42,7 @@
 
 #ifdef _IS_WINDOWS_
 #include <windows.h>
+#include <cstring>
 #include <tlhelp32.h>
 #endif
 #ifdef _IS_UNIX_
@@ -59,13 +63,16 @@ const QString & gmicConfigPath(bool create)
   const QString qpath = QString::fromLocal8Bit(gmic::path_rc());
 #endif
   static QString result;
+  static QMutex mutex;
   QFileInfo pathInfo(qpath);
 
   if (create) gmic::init_rc();
-  if (pathInfo.isDir()) {
-    result = qpath;
-  } else {
-    result.clear();
+  const QString newValue = pathInfo.isDir() ? qpath : QString();
+  QMutexLocker locker(&mutex);
+  // The returned reference is shared: avoid reassigning it when the value is unchanged,
+  // so that concurrent readers (e.g. logging from other threads) are not disturbed.
+  if (result != newValue) {
+    result = newValue;
   }
   return result;
 }
@@ -73,13 +80,16 @@ const QString & gmicConfigPath(bool create)
 unsigned int host_app_pid()
 {
 #if defined(_IS_UNIX_)
-  return static_cast<int>(getppid());
+  return static_cast<unsigned int>(getppid());
 #elif defined(_IS_WINDOWS_)
+  const DWORD pid = GetCurrentProcessId();
   HANDLE h = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (h == INVALID_HANDLE_VALUE) {
+    return static_cast<unsigned int>(pid); // Process own id if the snapshot could not be taken
+  }
   PROCESSENTRY32 pe;
   memset(&pe, 0, sizeof(PROCESSENTRY32));
   pe.dwSize = sizeof(PROCESSENTRY32);
-  DWORD pid = GetCurrentProcessId();
   if (Process32First(h, &pe)) {
     do {
       if (pe.th32ProcessID == pid) {
@@ -129,32 +139,30 @@ bool touchFile(const QString & path)
     return false;
   }
   const auto size = file.size();
-  file.resize(size + 1);
-  file.resize(size);
-  return true;
+  return file.resize(size + 1) && file.resize(size);
 }
 
 bool writeAll(const QByteArray & array, QFile & file)
 {
-  qint64 toBeWritten = array.size();
+  const qint64 total = array.size();
   qint64 totalWritten = 0;
-  qint64 writtenByCall = 0;
-  qint64 maxBytesPerWrite = 10l << 20;
+  const qint64 maxBytesPerWrite = 10ll << 20;
   const char * data = array.constData();
-  do {
-    writtenByCall = file.write(data, std::min(toBeWritten, maxBytesPerWrite));
-    if (writtenByCall == -1) {
+  while (totalWritten < total) {
+    const qint64 writtenByCall = file.write(data + totalWritten, std::min(total - totalWritten, maxBytesPerWrite));
+    if (writtenByCall <= 0) { // -1 on error; 0 would make no progress (infinite loop otherwise)
       Logger::error(QString("Could not properly write file %1 (%2/%3 bytes written)") //
                         .arg(file.fileName())
                         .arg(totalWritten)
-                        .arg(array.size()));
+                        .arg(total));
       return false;
     }
-    data += writtenByCall;
     totalWritten += writtenByCall;
-    toBeWritten -= writtenByCall;
-  } while (toBeWritten);
-  file.flush();
+  }
+  if (!file.flush()) {
+    Logger::error(QString("Could not flush file %1 (%2 bytes written)").arg(file.fileName()).arg(totalWritten));
+    return false;
+  }
   return true;
 }
 
@@ -165,13 +173,18 @@ bool safelyWrite(const QByteArray & array, const QString & filename)
     Logger::error(QString("Folder is not writable (%1)").arg(directory));
     return false;
   }
-  QTemporaryFile temporary;
-  temporary.setAutoRemove(false);
-  const bool ok = temporary.open()                                              //
-                  && writeAll(array, temporary)                                 //
-                  && (!QFileInfo(filename).exists() || QFile::remove(filename)) //
-                  && temporary.copy(filename);
-  temporary.remove();
-  return ok;
+  // QSaveFile writes to a temporary file located in the same folder, and only replaces the
+  // destination file on commit(): the original file is left untouched if anything fails.
+  QSaveFile file(filename);
+  if (!file.open(QIODevice::WriteOnly)) {
+    Logger::error(QString("Could not open file %1 for writing (%2)").arg(filename, file.errorString()));
+    return false;
+  }
+  if (file.write(array) != array.size() || !file.commit()) {
+    Logger::error(QString("Could not properly write file %1 (%2)").arg(filename, file.errorString()));
+    file.cancelWriting();
+    return false;
+  }
+  return true;
 }
 } // namespace GmicQt
