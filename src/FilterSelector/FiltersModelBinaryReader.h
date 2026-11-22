@@ -22,42 +22,42 @@
  *  along with gmic_qt.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+#ifndef GMIC_QT_FILTERSMODELBINARYREADER_H
+#define GMIC_QT_FILTERSMODELBINARYREADER_H
 
 #include <QByteArray>
 #include <QDataStream>
 #include <QList>
 #include <QString>
-#ifndef GMIC_QT_FILTERSMODELBINARYREADER_H
-#define GMIC_QT_FILTERSMODELBINARYREADER_H
+#include "FilterSelector/FiltersModel.h"
 
 namespace GmicQt
 {
 
-class FiltersModel;
-
 class FiltersModelBinaryReader {
 public:
-  FiltersModelBinaryReader(FiltersModel & model);
+  explicit FiltersModelBinaryReader(FiltersModel & model);
+
+  /**
+   * Fill the model from a binary cache file.
+   *
+   * The model is left untouched if the file cannot be read entirely and
+   * successfully (missing file, wrong magic number, truncated or corrupted
+   * content...), so that the caller can safely fall back on parsing the
+   * filter definitions.
+   */
   bool read(const QString & filename);
+
   static QByteArray readHash(const QString & filename);
 
 private:
   FiltersModel & _model;
   static bool readHeader(QDataStream & stream, QByteArray & hash);
-  inline static void readStringList(QDataStream & stream, QList<QString> & list);
+  static bool readString(QDataStream & stream, QString & string);
+  static bool readStringList(QDataStream & stream, QList<QString> & list);
+  static bool readFilter(QDataStream & stream, FiltersModel::Filter & filter);
+  static bool isValidInputMode(quint8 value);
 };
-
-void FiltersModelBinaryReader::readStringList(QDataStream & stream, QList<QString> & list)
-{
-  list.clear();
-  quint8 size;
-  stream >> size;
-  QByteArray array;
-  while (size--) {
-    stream >> array;
-    list.push_back(QString::fromUtf8(array));
-  }
-}
 
 } // namespace GmicQt
 

@@ -23,14 +23,15 @@
  *
  */
 #include "FilterSelector/FiltersModelBinaryWriter.h"
+#include <QDataStream>
+#include <QMap>
+#include <QString>
+#include <limits>
 #include "Common.h"
 #include "FilterSelector/FiltersModel.h"
 #include "GmicQt.h"
-
-#include <QDataStream>
-#include <QFile>
-#include <QMap>
-#include <QString>
+#include "Logger.h"
+#include "Utils.h"
 
 namespace GmicQt
 {
@@ -40,11 +41,17 @@ FiltersModelBinaryWriter::FiltersModelBinaryWriter(const FiltersModel & model) :
 bool FiltersModelBinaryWriter::write(const QString & filename, const QByteArray & hash)
 {
   TIMING;
-  QFile file(filename);
-  if (!file.open(QFile::WriteOnly)) {
+  if (hash.isEmpty()) {
+    // The reader rejects a cache without hash: do not write a useless file.
+    Logger::warning("Filters binary cache: not written (empty hash)");
     return false;
   }
-  QDataStream stream(&file);
+
+  // The whole cache is first serialized in memory, then written at once and atomically.
+  // Previously, a failure while writing (full disk, crash...) left a truncated cache
+  // which was indistinguishable from a valid one when only its header was checked.
+  QByteArray buffer;
+  QDataStream stream(&buffer, QIODevice::WriteOnly);
 
   stream << (quint32)0x03300330;
   stream << (quint32)100;
@@ -56,25 +63,46 @@ bool FiltersModelBinaryWriter::write(const QString & filename, const QByteArray 
   const QMap<QString, FiltersModel::Filter>::const_iterator end = _model._hash2filter.cend();
 
   while (it != end) {
-    stream << it.value()._name.toUtf8();
-    stream << it.value()._plainText.toUtf8();
-    stream << it.value()._translatedPlainText.toUtf8();
-    writeStringList(it.value()._path, stream);
-    writeStringList(it.value()._plainPath, stream);
-    writeStringList(it.value()._translatedPlainPath, stream);
-    stream << it.value()._command.toUtf8();
-    stream << it.value()._previewCommand.toUtf8();
-    stream << quint8(it.value()._defaultInputMode);
-    stream << it.value()._parameters.toUtf8();
-    stream << it.value()._previewFactor;
-    stream << it.value()._isAccurateIfZoomed;
-    stream << it.value()._previewFromFullImage;
-    stream << it.value()._hash.toUtf8();
-    stream << it.value()._isWarning;
+    const FiltersModel::Filter & filter = it.value();
+    stream << filter._name.toUtf8();
+    stream << filter._plainText.toUtf8();
+    stream << filter._translatedPlainText.toUtf8();
+    if (!writeStringList(filter._path, stream) || !writeStringList(filter._plainPath, stream) || !writeStringList(filter._translatedPlainPath, stream)) {
+      Logger::error(QString("Filters binary cache: not written (path too long for filter %1)").arg(filter._plainText));
+      return false;
+    }
+    stream << filter._command.toUtf8();
+    stream << filter._previewCommand.toUtf8();
+    stream << quint8(filter._defaultInputMode);
+    stream << filter._parameters.toUtf8();
+    stream << filter._previewFactor;
+    stream << filter._isAccurateIfZoomed;
+    stream << filter._previewFromFullImage;
+    stream << filter._hash.toUtf8();
+    stream << filter._isWarning;
     ++it;
   }
 
+  if (stream.status() != QDataStream::Ok) {
+    Logger::error("Filters binary cache: serialization error");
+    return false;
+  }
+  const bool ok = safelyWrite(buffer, filename);
   TIMING;
+  return ok;
+}
+
+bool FiltersModelBinaryWriter::writeStringList(const QList<QString> & list, QDataStream & stream)
+{
+  // The list size is stored on one byte: refuse to silently truncate it
+  // (which would desynchronize the reader and corrupt the whole cache).
+  if (list.size() > static_cast<int>(std::numeric_limits<quint8>::max())) {
+    return false;
+  }
+  stream << static_cast<quint8>(list.size());
+  for (const QString & str : list) {
+    stream << str.toUtf8();
+  }
   return true;
 }
 

@@ -25,7 +25,7 @@
 #ifndef GMIC_QT_FILTERSMODELBINARYWRITER_H
 #define GMIC_QT_FILTERSMODELBINARYWRITER_H
 
-class QByteArray;
+#include <QByteArray>
 #include <QDataStream>
 #include <QList>
 #include <QString>
@@ -37,21 +37,20 @@ class FiltersModel;
 
 class FiltersModelBinaryWriter {
 public:
-  FiltersModelBinaryWriter(const FiltersModel & model);
+  explicit FiltersModelBinaryWriter(const FiltersModel & model);
+
+  /**
+   * Write the model to a binary cache file.
+   *
+   * The file is written atomically (see safelyWrite()): an existing cache is
+   * never replaced by a partial one if something goes wrong.
+   */
   bool write(const QString & filename, const QByteArray & hash);
 
 private:
-  static inline void writeStringList(const QList<QString> & list, QDataStream & stream);
+  static bool writeStringList(const QList<QString> & list, QDataStream & stream);
   const FiltersModel & _model;
 };
-
-void FiltersModelBinaryWriter::writeStringList(const QList<QString> & list, QDataStream & stream)
-{
-  stream << (quint8)list.size();
-  for (const QString & str : list) {
-    stream << str.toUtf8();
-  }
-}
 
 } // namespace GmicQt
 

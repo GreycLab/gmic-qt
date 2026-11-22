@@ -113,6 +113,7 @@ void FiltersModel::removePath(const QList<QString> & path)
 
 FiltersModel::Filter::Filter()
 {
+  _defaultInputMode = InputMode::Unspecified; // Was left uninitialized (and then written to the binary cache)
   _previewFactor = PreviewFactorAny;
   _isAccurateIfZoomed = false;
   _previewFromFullImage = false;
@@ -352,3 +353,6 @@ bool FiltersModel::const_iterator::operator==(const FiltersModel::const_iterator
 }
 
 } // namespace GmicQt
+
+
+
