@@ -23,14 +23,14 @@
  *
  */
 #include "ParametersCache.h"
-#include <QBuffer>
-#include <QDataStream>
+#include <QByteArray>
 #include <QDebug>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <iostream>
+#include <QJsonValue>
+#include <QStringList>
 #include "Common.h"
 #include "Globals.h"
 #include "Logger.h"
@@ -39,6 +39,45 @@
 
 namespace GmicQt
 {
+
+namespace
+{
+
+// The parameters file is normally a few kilobytes to a few megabytes long.
+const qint64 MaxParametersFileSize = 64ll << 20;
+const quint32 MaxUncompressedSize = 256u << 20;
+
+/*
+ * qUncompress() trusts the size announced in the first four bytes (big endian) of the data and
+ * allocates that much memory: refuse absurd values coming from a corrupted file.
+ */
+QByteArray safelyUncompress(const QByteArray & data)
+{
+  if (data.size() < 4) {
+    return QByteArray();
+  }
+  const uchar * p = reinterpret_cast<const uchar *>(data.constData());
+  const quint32 announcedSize = (quint32(p[0]) << 24) | (quint32(p[1]) << 16) | (quint32(p[2]) << 8) | quint32(p[3]);
+  if (announcedSize > MaxUncompressedSize) {
+    Logger::error(QString("Parameters file: announced uncompressed size is too large (%1 bytes)").arg(announcedSize));
+    return QByteArray();
+  }
+  return qUncompress(data);
+}
+
+template <typename T> void removeObsoleteKeys(QHash<QString, T> & hash, const QSet<QString> & hashesToKeep)
+{
+  for (auto it = hash.begin(); it != hash.end();) {
+    if (hashesToKeep.contains(it.key())) {
+      ++it;
+    } else {
+      it = hash.erase(it);
+    }
+  }
+}
+
+} // namespace
+
 QHash<QString, QList<QString>> ParametersCache::_parametersCache;
 QHash<QString, InputOutputState> ParametersCache::_inOutPanelStates;
 QHash<QString, QList<int>> ParametersCache::_visibilityStates;
@@ -50,65 +89,70 @@ void ParametersCache::load(bool loadFiltersParameters)
   _inOutPanelStates.clear();
   _visibilityStates.clear();
 
-  QString jsonFilename = QString("%1%2").arg(gmicConfigPath(true), PARAMETERS_CACHE_FILENAME);
+  const QString jsonFilename = QString("%1%2").arg(gmicConfigPath(true), PARAMETERS_CACHE_FILENAME);
   QFile jsonFile(jsonFilename);
   if (!jsonFile.exists()) {
     return;
   }
-  if (jsonFile.open(QFile::ReadOnly)) {
-    QJsonDocument jsonDoc;
-    QByteArray allFile = jsonFile.readAll();
-    if (allFile.startsWith("{")) { // Was created in debug mode
-      jsonDoc = QJsonDocument::fromJson(allFile);
-    } else {
-      jsonDoc = QJsonDocument::fromJson(qUncompress(allFile));
-    }
-    if (jsonDoc.isNull()) {
-      Logger::warning(QString("Cannot parse ") + jsonFilename);
-      Logger::warning("Last filters parameters are lost!");
-    } else {
-      if (!jsonDoc.isObject()) {
-        Logger::error(QString("JSON file format is not correct (") + jsonFilename + ")");
-      } else {
-        QJsonObject documentObject = jsonDoc.object();
-        QJsonObject::iterator itFilter = documentObject.begin();
-        while (itFilter != documentObject.end()) {
-          QString hash = itFilter.key();
-          QJsonObject filterObject = itFilter.value().toObject();
-          // Retrieve parameters
-          if (loadFiltersParameters) {
-            QJsonValue parameters = filterObject.value("parameters");
-            if (!parameters.isUndefined()) {
-              QJsonArray array = parameters.toArray();
-              QStringList values;
-              for (const QJsonValueRef v : array) {
-                values.push_back(v.toString());
-              }
-              _parametersCache[hash] = values;
-            }
-            QJsonValue visibilityStates = filterObject.value("visibility_states");
-            if (!visibilityStates.isUndefined()) {
-              QJsonArray array = visibilityStates.toArray();
-              QList<int> values;
-              for (const QJsonValueRef v : array) {
-                values.push_back(v.toInt());
-              }
-              _visibilityStates[hash] = values;
-            }
-          }
-          QJsonValue state = filterObject.value("in_out_state");
-          // Retrieve Input/Output state
-          if (!state.isUndefined()) {
-            QJsonObject stateObject = state.toObject();
-            _inOutPanelStates[hash] = InputOutputState::fromJSONObject(stateObject);
-          }
-          ++itFilter;
-        }
-      }
-    }
-  } else {
+  if (!jsonFile.open(QFile::ReadOnly)) {
     Logger::error("Cannot open " + jsonFilename);
     Logger::error("Parameters cannot be restored");
+    return;
+  }
+  if (jsonFile.size() > MaxParametersFileSize) {
+    Logger::error("Parameters file is too large: " + jsonFilename);
+    Logger::warning("Last filters parameters are lost!");
+    return;
+  }
+  const QByteArray allFile = jsonFile.readAll();
+  QByteArray json;
+  if (allFile.startsWith("{")) { // Was created in debug mode
+    json = allFile;
+  } else {
+    json = safelyUncompress(allFile);
+  }
+  QJsonParseError parseError;
+  const QJsonDocument jsonDoc = QJsonDocument::fromJson(json, &parseError);
+  if (jsonDoc.isNull()) {
+    Logger::warning(QString("Cannot parse ") + jsonFilename + " (" + parseError.errorString() + ")");
+    Logger::warning("Last filters parameters are lost!");
+    return;
+  }
+  if (!jsonDoc.isObject()) {
+    Logger::error(QString("JSON file format is not correct (") + jsonFilename + ")");
+    return;
+  }
+
+  const QJsonObject documentObject = jsonDoc.object();
+  for (auto itFilter = documentObject.constBegin(); itFilter != documentObject.constEnd(); ++itFilter) {
+    const QString hash = itFilter.key();
+    const QJsonObject filterObject = itFilter.value().toObject();
+    // Retrieve parameters
+    if (loadFiltersParameters) {
+      const QJsonValue parameters = filterObject.value("parameters");
+      if (parameters.isArray()) {
+        QStringList values;
+        const QJsonArray array = parameters.toArray();
+        for (const QJsonValue & v : array) {
+          values.push_back(v.toString());
+        }
+        _parametersCache[hash] = values;
+      }
+      const QJsonValue visibilityStates = filterObject.value("visibility_states");
+      if (visibilityStates.isArray()) {
+        QList<int> values;
+        const QJsonArray array = visibilityStates.toArray();
+        for (const QJsonValue & v : array) {
+          values.push_back(v.toInt());
+        }
+        _visibilityStates[hash] = values;
+      }
+    }
+    // Retrieve Input/Output state
+    const QJsonValue state = filterObject.value("in_out_state");
+    if (state.isObject()) {
+      _inOutPanelStates[hash] = InputOutputState::fromJSONObject(state.toObject());
+    }
   }
 }
 
@@ -143,66 +187,48 @@ void ParametersCache::save()
   QJsonObject documentObject;
 
   // Add Input/Output states
-  QHash<QString, InputOutputState>::iterator itState = _inOutPanelStates.begin();
-  while (itState != _inOutPanelStates.end()) {
+  for (auto itState = _inOutPanelStates.cbegin(); itState != _inOutPanelStates.cend(); ++itState) {
     QJsonObject filterObject;
     QJsonObject jsonState;
     itState.value().toJSONObject(jsonState);
     filterObject.insert("in_out_state", jsonState);
     documentObject.insert(itState.key(), filterObject);
-    ++itState;
   }
 
   // Add filters parameters
-
-  QHash<QString, QList<QString>>::iterator itParams = _parametersCache.begin();
-  while (itParams != _parametersCache.end()) {
-    QJsonObject filterObject;
-    QJsonObject::iterator entry = documentObject.find(itParams.key());
-    if (entry != documentObject.end()) {
-      filterObject = entry.value().toObject();
-    }
+  for (auto itParams = _parametersCache.cbegin(); itParams != _parametersCache.cend(); ++itParams) {
+    QJsonObject filterObject = documentObject.value(itParams.key()).toObject();
     // Add the parameters list
     QJsonArray array;
-    QStringList list = itParams.value();
-    for (const QString & str : list) {
+    for (const QString & str : itParams.value()) {
       array.push_back(str);
     }
     filterObject.insert("parameters", array);
     documentObject.insert(itParams.key(), filterObject);
-    ++itParams;
   }
 
   // Add visibility states
-
-  QHash<QString, QList<int>>::iterator itVisibilities = _visibilityStates.begin();
-  while (itVisibilities != _visibilityStates.end()) {
-    QJsonObject filterObject;
-    QJsonObject::iterator entry = documentObject.find(itVisibilities.key());
-    if (entry != documentObject.end()) {
-      filterObject = entry.value().toObject();
-    }
-    // Add the parameters list
+  for (auto itVisibilities = _visibilityStates.cbegin(); itVisibilities != _visibilityStates.cend(); ++itVisibilities) {
+    QJsonObject filterObject = documentObject.value(itVisibilities.key()).toObject();
+    // Add the visibility states list
     QJsonArray array;
-    QList<int> states = itVisibilities.value();
-    for (const int & state : states) {
+    for (const int state : itVisibilities.value()) {
       array.push_back(state);
     }
     filterObject.insert("visibility_states", array);
     documentObject.insert(itVisibilities.key(), filterObject);
-    ++itVisibilities;
   }
 
-  QJsonDocument jsonDoc(documentObject);
-  QString jsonFilename = QString("%1%2").arg(gmicConfigPath(true), PARAMETERS_CACHE_FILENAME);
+  const QJsonDocument jsonDoc(documentObject);
+  const QString jsonFilename = QString("%1%2").arg(gmicConfigPath(true), PARAMETERS_CACHE_FILENAME);
 #ifdef _GMIC_QT_DEBUG_
-  QByteArray array(jsonDoc.toJson());
+  const QByteArray array(jsonDoc.toJson());
 #else
-  QByteArray array(qCompress(jsonDoc.toJson(QJsonDocument::Compact)));
+  const QByteArray array(qCompress(jsonDoc.toJson(QJsonDocument::Compact)));
 #endif
   if (safelyWrite(array, jsonFilename)) {
     // Remove obsolete 2.0.0 pre-release files
-    const QString & path = gmicConfigPath(true);
+    const QString path = gmicConfigPath(true);
     QFile::remove(path + "gmic_qt_parameters.dat");
     QFile::remove(path + "gmic_qt_parameters.json");
     QFile::remove(path + "gmic_qt_parameters.json.bak");
@@ -220,10 +246,7 @@ void ParametersCache::setValues(const QString & hash, const QList<QString> & val
 
 QList<QString> ParametersCache::getValues(const QString & hash)
 {
-  if (_parametersCache.contains(hash)) {
-    return _parametersCache[hash];
-  }
-  return QList<QString>();
+  return _parametersCache.value(hash);
 }
 
 void ParametersCache::setVisibilityStates(const QString & hash, const QList<int> & states)
@@ -233,10 +256,7 @@ void ParametersCache::setVisibilityStates(const QString & hash, const QList<int>
 
 QList<int> ParametersCache::getVisibilityStates(const QString & hash)
 {
-  if (_visibilityStates.contains(hash)) {
-    return _visibilityStates[hash];
-  }
-  return QList<int>();
+  return _visibilityStates.value(hash);
 }
 
 void ParametersCache::remove(const QString & hash)
@@ -248,10 +268,7 @@ void ParametersCache::remove(const QString & hash)
 
 InputOutputState ParametersCache::getInputOutputState(const QString & hash)
 {
-  if (_inOutPanelStates.contains(hash)) {
-    return _inOutPanelStates[hash];
-  }
-  return {InputMode::Unspecified, DefaultOutputMode};
+  return _inOutPanelStates.value(hash, InputOutputState(InputMode::Unspecified, DefaultOutputMode));
 }
 
 void ParametersCache::setInputOutputState(const QString & hash, const InputOutputState & state, const InputMode defaultInputMode)
@@ -266,33 +283,9 @@ void ParametersCache::setInputOutputState(const QString & hash, const InputOutpu
 
 void ParametersCache::cleanup(const QSet<QString> & hashesToKeep)
 {
-  QSet<QString> obsoleteHashes;
-
-  // Build set of no longer used parameters
-  QHash<QString, QList<QString>>::iterator itParam = _parametersCache.begin();
-  while (itParam != _parametersCache.end()) {
-    if (!hashesToKeep.contains(itParam.key())) {
-      obsoleteHashes.insert(itParam.key());
-    }
-    ++itParam;
-  }
-  for (const QString & h : obsoleteHashes) {
-    _parametersCache.remove(h);
-  }
-  obsoleteHashes.clear();
-
-  // Build set of no longer used In/Out states
-  QHash<QString, InputOutputState>::iterator itState = _inOutPanelStates.begin();
-  while (itState != _inOutPanelStates.end()) {
-    if (!hashesToKeep.contains(itState.key())) {
-      obsoleteHashes.insert(itState.key());
-    }
-    ++itState;
-  }
-  for (const QString & h : obsoleteHashes) {
-    _inOutPanelStates.remove(h);
-  }
-  obsoleteHashes.clear();
+  removeObsoleteKeys(_parametersCache, hashesToKeep);
+  removeObsoleteKeys(_inOutPanelStates, hashesToKeep);
+  removeObsoleteKeys(_visibilityStates, hashesToKeep);
 }
 
 } // namespace GmicQt

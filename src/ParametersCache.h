@@ -27,6 +27,7 @@
 
 #include <QHash>
 #include <QList>
+#include <QSet>
 #include <QString>
 #include "InputOutputState.h"
 

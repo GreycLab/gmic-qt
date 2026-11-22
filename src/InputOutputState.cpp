@@ -29,16 +29,37 @@
 
 namespace
 {
-void filterDeprecatedInputMode(GmicQt::InputMode & mode)
+
+/*
+ * Values read from a JSON file must never be blindly cast to an enumeration:
+ * unknown (or deprecated) values are mapped to "Unspecified".
+ */
+GmicQt::InputMode sanitizedInputMode(int value)
 {
-  switch (mode) {
-  case GmicQt::InputMode::AllDesc_DEPRECATED:
-  case GmicQt::InputMode::AllVisiblesDesc_DEPRECATED:
-  case GmicQt::InputMode::AllInvisiblesDesc_DEPRECATED:
-    mode = GmicQt::InputMode::Unspecified;
-    break;
-  default:
-    break;
+  switch (value) {
+  case static_cast<int>(GmicQt::InputMode::NoInput):
+  case static_cast<int>(GmicQt::InputMode::Active):
+  case static_cast<int>(GmicQt::InputMode::All):
+  case static_cast<int>(GmicQt::InputMode::ActiveAndBelow):
+  case static_cast<int>(GmicQt::InputMode::ActiveAndAbove):
+  case static_cast<int>(GmicQt::InputMode::AllVisible):
+  case static_cast<int>(GmicQt::InputMode::AllInvisible):
+    return static_cast<GmicQt::InputMode>(value);
+  default: // Includes Unspecified and the deprecated modes
+    return GmicQt::InputMode::Unspecified;
+  }
+}
+
+GmicQt::OutputMode sanitizedOutputMode(int value)
+{
+  switch (value) {
+  case static_cast<int>(GmicQt::OutputMode::InPlace):
+  case static_cast<int>(GmicQt::OutputMode::NewLayers):
+  case static_cast<int>(GmicQt::OutputMode::NewActiveLayers):
+  case static_cast<int>(GmicQt::OutputMode::NewImage):
+    return static_cast<GmicQt::OutputMode>(value);
+  default: // Includes Unspecified
+    return GmicQt::OutputMode::Unspecified;
   }
 }
 
@@ -83,9 +104,8 @@ void InputOutputState::toJSONObject(QJsonObject & object) const
 InputOutputState InputOutputState::fromJSONObject(const QJsonObject & object)
 {
   InputOutputState state;
-  state.inputMode = static_cast<InputMode>(object.value("InputLayers").toInt(static_cast<int>(InputMode::Unspecified)));
-  filterDeprecatedInputMode(state.inputMode);
-  state.outputMode = static_cast<OutputMode>(object.value("OutputMode").toInt(static_cast<int>(OutputMode::Unspecified)));
+  state.inputMode = sanitizedInputMode(object.value("InputLayers").toInt(static_cast<int>(InputMode::Unspecified)));
+  state.outputMode = sanitizedOutputMode(object.value("OutputMode").toInt(static_cast<int>(OutputMode::Unspecified)));
   return state;
 }
 
