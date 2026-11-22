@@ -278,6 +278,16 @@ inline void _GIMP_ITEM_SET_NAME(_GimpItemPtr item_ID, const gchar * name)
 }
 #endif
 
+// gimp_item_get_name() returns a newly allocated string which must be freed with g_free().
+// This helper copies it and frees it (an empty string is returned if there is no name).
+QByteArray getItemName(_GimpItemPtr item)
+{
+  gchar * name = gimp_item_get_name(item);
+  QByteArray result(name ? name : "");
+  g_free(name);
+  return result;
+}
+
 // Get layer blending mode from string.
 //-------------------------------------
 void get_output_layer_props(const char * const s, GimpLayerModeEffects & blendmode, double & opacity, int & posx, int & posy, gmic_library::gmic_image<char> & name)
@@ -572,7 +582,7 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
     } else {
       _gimp_drawable_get_offsets(_GIMP_DRAWABLE(inputLayers[l]), &xPos, &yPos);
     }
-    QString noParenthesisName(gimp_item_get_name(_GIMP_ITEM(inputLayers[l])));
+    QString noParenthesisName = QString::fromUtf8(getItemName(_GIMP_ITEM(inputLayers[l])));
     noParenthesisName.replace(QChar('('), QChar(21)).replace(QChar(')'), QChar(22));
 
     QString name = QString("mode(%1),opacity(%2),pos(%3,%4),name(%5)").arg(blendingMode2String(blendMode)).arg(opacity).arg(xPos).arg(yPos).arg(noParenthesisName);
@@ -670,7 +680,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
         layer_blendmode = gimp_layer_get_mode(inputLayers[p]);
         layer_opacity = gimp_layer_get_opacity(inputLayers[p]);
         _gimp_drawable_get_offsets(_GIMP_DRAWABLE(inputLayers[p]), &layer_posx, &layer_posy);
-        gmic_library::gmic_image<char>::string(gimp_item_get_name(_GIMP_ITEM(inputLayers[p]))).move_to(layer_name);
+        gmic_library::gmic_image<char>::string(getItemName(_GIMP_ITEM(inputLayers[p])).constData()).move_to(layer_name);
         get_output_layer_props(imageNames[p], layer_blendmode, layer_opacity, layer_posx, layer_posy, layer_name);
         gmic_library::gmic_image<gmic_pixel_type> & img = images[p];
         GmicQt::calibrateImage(img, inputLayerDimensions(p, 3), false);
@@ -713,7 +723,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
             if (!is_selection) {
               _gimp_drawable_get_offsets(_GIMP_DRAWABLE(inputLayers[p]), &layer_posx, &layer_posy);
             }
-            gmic_library::gmic_image<char>::string(gimp_item_get_name(_GIMP_ITEM(inputLayers[p]))).move_to(layer_name);
+            gmic_library::gmic_image<char>::string(getItemName(_GIMP_ITEM(inputLayers[p])).constData()).move_to(layer_name);
             gimp_image_remove_layer(gmic_qt_gimp_image_id, inputLayers[p]);
           } else {
             layer_blendmode = GIMP_NORMAL_MODE;
@@ -784,7 +794,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
             if (!is_selection) {
               _gimp_drawable_get_offsets(_GIMP_DRAWABLE(active_layer_id), &layer_posx, &layer_posy);
             }
-            gmic_library::gmic_image<char>::string(gimp_item_get_name(_GIMP_ITEM(active_layer_id))).move_to(layer_name);
+            gmic_library::gmic_image<char>::string(getItemName(_GIMP_ITEM(active_layer_id)).constData()).move_to(layer_name);
           } else {
             layer_name.assign();
           }
@@ -864,7 +874,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
             if (!is_selection) {
               _gimp_drawable_get_offsets(_GIMP_DRAWABLE(active_layer_id), &layer_posx, &layer_posy);
             }
-            gmic_library::gmic_image<char>::string(gimp_item_get_name(_GIMP_ITEM(active_layer_id))).move_to(layer_name);
+            gmic_library::gmic_image<char>::string(getItemName(_GIMP_ITEM(active_layer_id)).constData()).move_to(layer_name);
           } else {
             layer_name.assign();
           }
