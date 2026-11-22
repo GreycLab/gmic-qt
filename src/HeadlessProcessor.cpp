@@ -27,6 +27,8 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QStringList>
+#include <algorithm>
+#include <limits>
 #include "Common.h"
 #include "FilterParameters/FilterParametersWidget.h"
 #include "FilterSelector/FiltersPresenter.h"
@@ -39,14 +41,9 @@
 #include "ParametersCache.h"
 #include "Settings.h"
 #include "Updater.h"
+#include "Utils.h"
 #include "Widgets/ProgressInfoWindow.h"
 #include "gmic.h"
-
-#ifdef _IS_WINDOWS_
-#include <windows.h>
-#include <process.h>
-#include <psapi.h>
-#endif
 
 namespace GmicQt
 {
@@ -56,11 +53,13 @@ namespace GmicQt
  * @param parent
  */
 HeadlessProcessor::HeadlessProcessor(QObject * parent) //
-    : QObject(parent), _filterThread(nullptr), _gmicImages(new gmic_library::gmic_list<gmic_pixel_type>)
+    : QObject(parent), _filterThread(nullptr), _gmicImages(nullptr), _progressWindow(nullptr), _outputMode(DefaultOutputMode), _inputMode(DefaultInputMode), _processingCompletedProperly(false)
 {
-  _progressWindow = nullptr;
-  _processingCompletedProperly = false;
+  // The modes used to be left uninitialized until setPluginParameters() was called.
+  // buildFullStdlib() may throw: allocate the list afterwards, so that it cannot leak
+  // (the destructor does not run when a constructor throws).
   GmicStdLib::Array = Updater::getInstance()->buildFullStdlib();
+  _gmicImages = new gmic_library::gmic_list<gmic_pixel_type>;
 }
 
 HeadlessProcessor::~HeadlessProcessor()
@@ -70,6 +69,14 @@ HeadlessProcessor::~HeadlessProcessor()
 
 bool HeadlessProcessor::setPluginParameters(const RunParameters & parameters)
 {
+  // Start from a clean state: a previous call must not leave a stale error message
+  // (or stale values) behind.
+  _errorMessage.clear();
+  _filterName.clear();
+  _hash.clear();
+  _command.clear();
+  _arguments.clear();
+  _gmicStatusQuotedParameters.clear();
   _path = QString::fromStdString(parameters.filterPath);
   _inputMode = (parameters.inputMode == InputMode::Unspecified) ? DefaultInputMode : parameters.inputMode;
   _outputMode = (parameters.outputMode == OutputMode::Unspecified) ? DefaultOutputMode : parameters.outputMode;
@@ -120,9 +127,16 @@ bool HeadlessProcessor::setPluginParameters(const RunParameters & parameters)
               _hash = filter.hash;
               _command = command;
               auto expandedDefaults = expandParameterList(defaultParameters, sizes);
-              auto completed = completePrefixFromFullList(providedParameters, expandedDefaults);
-              _arguments = flattenGmicParameterList(mergeSubsequences(completed, sizes), quoted);
-              _gmicStatusQuotedParameters = quoted;
+              const QStringList completed = completePrefixFromFullList(providedParameters, expandedDefaults);
+              const QStringList merged = mergeSubsequences(completed, sizes);
+              if (merged.isEmpty() && !sizes.isEmpty()) {
+                // mergeSubsequences() returns an empty list when the supplied parameters do not fit
+                // the filter definition: do not silently run the filter without any argument.
+                _errorMessage = tr("Error parsing supplied command: %1").arg(QString::fromStdString(parameters.command));
+              } else {
+                _arguments = flattenGmicParameterList(merged, quoted);
+                _gmicStatusQuotedParameters = quoted;
+              }
             }
           }
         }
@@ -141,11 +155,15 @@ void HeadlessProcessor::startProcessing()
 {
   if (!_errorMessage.isEmpty()) {
     endApplication(_errorMessage);
+    return; // The function used to go on and run the filter with an invalid configuration.
+  }
+  if (_filterThread) {
+    return; // Already processing
   }
 
   _singleShotTimer.setInterval(750);
   _singleShotTimer.setSingleShot(true);
-  connect(&_singleShotTimer, &QTimer::timeout, this, &HeadlessProcessor::progressWindowShouldShow);
+  connect(&_singleShotTimer, &QTimer::timeout, this, &HeadlessProcessor::progressWindowShouldShow, Qt::UniqueConnection);
   ParametersCache::load(true);
 
   _singleShotTimer.start();
@@ -164,7 +182,7 @@ void HeadlessProcessor::startProcessing()
   _processingCompletedProperly = false;
   connect(_filterThread, &FilterThread::finished, this, &HeadlessProcessor::onProcessingFinished);
   _timer.setInterval(250);
-  connect(&_timer, &QTimer::timeout, this, &HeadlessProcessor::sendProgressInformation);
+  connect(&_timer, &QTimer::timeout, this, &HeadlessProcessor::sendProgressInformation, Qt::UniqueConnection);
   _timer.start();
   _filterThread->start();
 }
@@ -196,31 +214,22 @@ void HeadlessProcessor::sendProgressInformation()
   }
   float progress = _filterThread->progress();
   int ms = _filterThread->duration();
+  // The signal carries an unsigned long, which is only 32 bits wide on 64-bit Windows:
+  // saturate instead of silently wrapping around above 4 GiB.
   unsigned long memory = 0;
-#if defined(_IS_UNIX_)
-  QFile status("/proc/self/status");
-  if (status.open(QFile::ReadOnly)) {
-    QByteArray text = status.readAll();
-    const char * str = strstr(text.constData(), "VmRSS:");
-    unsigned int kiB = 0;
-    if (str && sscanf(str + 7, "%u", &kiB)) {
-      memory = 1024 * (unsigned long)kiB;
-    }
+  quint64 bytes = 0;
+  if (processMemoryUsage(bytes)) {
+    memory = static_cast<unsigned long>(std::min<quint64>(bytes, std::numeric_limits<unsigned long>::max()));
   }
-#elif defined(_IS_WINDOWS_)
-  PROCESS_MEMORY_COUNTERS counters;
-  if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
-    memory = static_cast<unsigned long>(counters.WorkingSetSize);
-  }
-#else
-// TODO: MACOS
-#endif
   emit progression(progress, ms, memory);
 }
 
 void HeadlessProcessor::onProcessingFinished()
 {
   _timer.stop();
+  if (!_filterThread) {
+    return;
+  }
   QString errorMessage;
   QStringList status = _filterThread->gmicStatus();
   if (_filterThread->failed()) {
@@ -229,24 +238,28 @@ void HeadlessProcessor::onProcessingFinished()
       errorMessage = tr("Filter execution failed, but with no error message.");
     }
   } else {
-    gmic_list<gmic_pixel_type> images = _filterThread->images();
     if (!_filterThread->aborted()) {
+      // Moving the images out of the thread instead of copying them: the previous code made a
+      // deep copy of all the output images (doubling the peak memory), even for an aborted run.
+      gmic_list<gmic_pixel_type> images;
+      _filterThread->swapImages(images);
       GmicQtHost::outputImages(images, _filterThread->imageNames(), _outputMode);
       _processingCompletedProperly = true;
     }
     QSettings settings;
+    const QString keyPrefix = QString("LastExecution/host_%1/").arg(GmicQtHost::ApplicationShortname);
     if (!status.isEmpty() && !_hash.isEmpty()) {
       ParametersCache::setValues(_hash, status);
       ParametersCache::save();
       QString statusString = flattenGmicParameterList(status, _gmicStatusQuotedParameters);
-      settings.setValue(QString("LastExecution/host_%1/GmicStatusString").arg(GmicQtHost::ApplicationShortname), statusString);
+      settings.setValue(keyPrefix + "GmicStatusString", statusString);
     }
-    settings.setValue(QString("LastExecution/host_%1/FilterPath").arg(GmicQtHost::ApplicationShortname), _path);
-    settings.setValue(QString("LastExecution/host_%1/FilterHash").arg(GmicQtHost::ApplicationShortname), _hash);
-    settings.setValue(QString("LastExecution/host_%1/Command").arg(GmicQtHost::ApplicationShortname), _command);
-    settings.setValue(QString("LastExecution/host_%1/Arguments").arg(GmicQtHost::ApplicationShortname), _arguments);
-    settings.setValue(QString("LastExecution/host_%1/InputMode").arg(GmicQtHost::ApplicationShortname), (int)_inputMode);
-    settings.setValue(QString("LastExecution/host_%1/OutputMode").arg(GmicQtHost::ApplicationShortname), (int)_outputMode);
+    settings.setValue(keyPrefix + "FilterPath", _path);
+    settings.setValue(keyPrefix + "FilterHash", _hash);
+    settings.setValue(keyPrefix + "Command", _command);
+    settings.setValue(keyPrefix + "Arguments", _arguments);
+    settings.setValue(keyPrefix + "InputMode", (int)_inputMode);
+    settings.setValue(keyPrefix + "OutputMode", (int)_outputMode);
   }
   _filterThread->deleteLater();
   _filterThread = nullptr;

@@ -25,6 +25,7 @@
 #ifndef GMIC_QT_UTILS_H
 #define GMIC_QT_UTILS_H
 
+#include <QtGlobal>
 #include "GmicQt.h"
 class QFile;
 class QByteArray;
@@ -39,6 +40,13 @@ const QString & pluginCodeName();
 bool touchFile(const QString & path);
 bool writeAll(const QByteArray & array, QFile & file);
 bool safelyWrite(const QByteArray & array, const QString & filename);
+
+/**
+ * Memory currently used by the current process (resident set), in bytes.
+ * @return false if the information is not available on this platform (or could not be read);
+ *         `bytes` is then left unchanged.
+ */
+bool processMemoryUsage(quint64 & bytes);
 } // namespace GmicQt
 
 #endif // GMIC_QT_UTILS_H

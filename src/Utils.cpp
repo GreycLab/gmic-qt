@@ -35,6 +35,7 @@
 #include <QStandardPaths>
 #include <QString>
 #include <algorithm>
+#include <limits>
 #include "Common.h"
 #include "Host/GmicQtHost.h"
 #include "Logger.h"
@@ -44,9 +45,55 @@
 #include <windows.h>
 #include <cstring>
 #include <tlhelp32.h>
+#include <psapi.h>
 #endif
 #ifdef _IS_UNIX_
 #include <unistd.h>
+#endif
+
+#ifdef _IS_UNIX_
+namespace
+{
+/**
+ * Looks for the "VmRSS:" entry in the content of /proc/self/status and reads the (unsigned)
+ * number which follows. Works on a bounded buffer, and reports any failure.
+ *
+ * It replaces strstr() + sscanf(str + 7, ...) where sscanf() returns EOF (a non-zero value) when
+ * no number is found, and where "str + 7" could point past the end of the buffer.
+ */
+bool parseVmRssKiB(const char * text, const int size, quint64 & kiB)
+{
+  static const char key[] = "VmRSS:";
+  const int keyLength = static_cast<int>(sizeof(key)) - 1;
+  if (!text || (size < keyLength)) {
+    return false;
+  }
+  const char * const end = text + size;
+  const char * found = std::search(text, end, key, key + keyLength);
+  if (found == end) {
+    return false;
+  }
+  const char * p = found + keyLength;
+  while ((p != end) && ((*p == ' ') || (*p == '\t'))) {
+    ++p;
+  }
+  const char * const digits = p;
+  quint64 value = 0;
+  while ((p != end) && (*p >= '0') && (*p <= '9')) {
+    const unsigned int digit = static_cast<unsigned int>(*p - '0');
+    if (value > (std::numeric_limits<quint64>::max() - digit) / 10) {
+      return false; // Overflow
+    }
+    value = value * 10 + digit;
+    ++p;
+  }
+  if (p == digits) {
+    return false;
+  }
+  kiB = value;
+  return true;
+}
+} // namespace
 #endif
 
 namespace GmicQt
@@ -187,4 +234,33 @@ bool safelyWrite(const QByteArray & array, const QString & filename)
   }
   return true;
 }
+
+bool processMemoryUsage(quint64 & bytes)
+{
+#if defined(_IS_UNIX_)
+  QFile status("/proc/self/status");
+  if (!status.open(QFile::ReadOnly)) {
+    return false;
+  }
+  const QByteArray text = status.readAll();
+  quint64 kiB = 0;
+  if (!parseVmRssKiB(text.constData(), text.size(), kiB) || (kiB > std::numeric_limits<quint64>::max() / 1024)) {
+    return false;
+  }
+  bytes = kiB * 1024;
+  return true;
+#elif defined(_IS_WINDOWS_)
+  PROCESS_MEMORY_COUNTERS counters = {};
+  counters.cb = sizeof(counters);
+  if (!GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
+    return false;
+  }
+  bytes = static_cast<quint64>(counters.WorkingSetSize);
+  return true;
+#else
+  Q_UNUSED(bytes)
+  return false;
+#endif
+}
+
 } // namespace GmicQt
