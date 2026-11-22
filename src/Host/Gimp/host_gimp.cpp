@@ -351,7 +351,7 @@ _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
 
 #if GIMP_CHECK_VERSION(3, 0, 0)
   _GimpLayerPtr * layers = gimp_image_get_layers(imageId);
-  int layersCount = gimp_core_object_array_get_length((GObject **)layers);
+  int layersCount = layers?gimp_core_object_array_get_length((GObject **)layers):0;
 #else
   int layersCount = 0;
   _GimpLayerPtr * layers = gimp_image_get_layers(imageId, &layersCount);
@@ -359,6 +359,7 @@ _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
   for (int i = layersCount - 1; i >= 0; --i) {
     idStack.push(layers[i]);
   }
+  g_free(layers);
 
   layersId.clear();
 
@@ -367,16 +368,19 @@ _GimpLayerPtr * get_gimp_layers_flat_list(_GimpImagePtr imageId, int * count)
     if (gimp_item_is_group(_GIMP_ITEM(idStack.top()))) {
 #if GIMP_CHECK_VERSION(3, 0, 0)
       _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()));
-      for (int i = 0; _GIMP_LAYER(children[i]) != NULL; ++i) {
-        ++childCount;
+      if (children) {
+        for (int i = 0; _GIMP_LAYER(children[i]) != NULL; ++i) {
+          ++childCount;
+        }
       }
 #else
       _GimpItemPtr * children = gimp_item_get_children(_GIMP_ITEM(idStack.top()), &childCount);
 #endif
       idStack.pop();
       for (int i = childCount - 1; i >= 0; --i) {
-        idStack.push(_GIMP_LAYER(children[i])); // TODO: Check if layers can have non-layer children.
+        idStack.push(_GIMP_LAYER(children[i]));
       }
+      g_free(children);
     } else {
       layersId.push_back(idStack.top());
       idStack.pop();
