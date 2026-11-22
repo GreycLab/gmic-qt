@@ -31,6 +31,7 @@
 #include <QWidget>
 #include "FilterTextTranslator.h"
 #include "HtmlTranslator.h"
+#include "Logger.h"
 
 namespace GmicQt
 {
@@ -49,10 +50,14 @@ int ButtonParameter::size() const
 
 bool ButtonParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _pushButton;
+  _pushButton = nullptr;
   _pushButton = new QPushButton(_text, widget);
   _pushButton->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
   _grid->addWidget(_pushButton, row, 0, 1, 3, _alignment);
@@ -97,26 +102,37 @@ void ButtonParameter::onPushButtonClicked(bool /* checked */)
 
 void ButtonParameter::connectButton()
 {
-  connect(_pushButton, &QPushButton::clicked, this, &ButtonParameter::onPushButtonClicked);
+  if (_pushButton) {
+    connect(_pushButton, &QPushButton::clicked, this, &ButtonParameter::onPushButtonClicked);
+  }
 }
 
 void ButtonParameter::disconnectButton()
 {
-  _pushButton->disconnect(this);
+  if (_pushButton) {
+    _pushButton->disconnect(this);
+  }
 }
 
 bool ButtonParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("button", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _text = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
-  QString & alignment = list[1];
+  const QString alignment = list[1].trimmed();
   if (alignment.isEmpty()) {
     return true;
   }
-  float a = alignment.toFloat();
+  // toFloat() returns 0 for a text which is not a number: it used to be taken as "left aligned".
+  bool ok = false;
+  const float a = alignment.toFloat(&ok);
+  if (!ok) {
+    Logger::warning(QString("Button parameter [%1] in filter [%2]: invalid alignment \"%3\", centered").arg(_text, filterName, alignment));
+    _alignment = Qt::AlignHCenter;
+    return true;
+  }
   if (a == 0.0f) {
     _alignment = Qt::AlignLeft;
   } else if (a == 1.0f) {

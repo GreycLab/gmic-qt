@@ -62,22 +62,28 @@ int TextParameter::size() const
 
 bool TextParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _label;
-  delete _lineEdit;
+  delete _lineEdit; // Also deletes the "update" action, which is a child of the line edit
   delete _textEdit;
+  _label = nullptr;
+  _lineEdit = nullptr;
+  _textEdit = nullptr;
+  _updateAction = nullptr; // Would otherwise dangle
+  _connected = false;      // The previous connections died with the previous widgets
   if (_multiline) {
-    _label = nullptr;
-    _lineEdit = nullptr;
     _textEdit = new MultilineTextParameterWidget(_name, _value, widget);
     _grid->addWidget(_textEdit, row, 0, 1, 3);
   } else {
-    _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
+    _label = new QLabel(_name, widget);
+    _grid->addWidget(_label, row, 0, 1, 1);
     setTextSelectable(_label);
     _lineEdit = new QLineEdit(_value, widget);
-    _textEdit = nullptr;
     _grid->addWidget(_lineEdit, row, 1, 1, 2);
 #if QT_VERSION_GTE(5, 2, 0)
     _updateAction = _lineEdit->addAction(IconLoader::load("view-refresh"), QLineEdit::TrailingPosition);
@@ -89,7 +95,14 @@ bool TextParameter::addTo(QWidget * widget, int row)
 
 QString TextParameter::value() const
 {
-  return _multiline ? _textEdit->text() : _lineEdit->text();
+  // The editors do not exist until addTo() has been called
+  if (_textEdit) {
+    return _textEdit->text();
+  }
+  if (_lineEdit) {
+    return _lineEdit->text();
+  }
+  return _value;
 }
 
 QString TextParameter::defaultValue() const
@@ -113,49 +126,47 @@ void TextParameter::setValue(const QString & value)
 
 void TextParameter::reset()
 {
+  _value = _default;
   if (_textEdit) {
     _textEdit->setText(_default);
   } else if (_lineEdit) {
     _lineEdit->setText(_default);
   }
-  _value = _default;
 }
 
 void TextParameter::randomize()
 {
-  if (acceptRandom()) {
-    static QString charset = QString::fromUtf8("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567890      ");
-    disconnectEditor();
-    QRandomGenerator * rng = QRandomGenerator::global();
-    int count = rng->bounded(5, 31);
-    int size = charset.size();
-    QString text;
-    while (count--) {
-      text.append(charset[rng->bounded(size)]);
-    }
-    if (_textEdit) {
-      _textEdit->setText(text);
-    } else if (_lineEdit) {
-      _lineEdit->setText(text);
-    }
-    connectEditor();
+  if (!acceptRandom()) {
+    return;
   }
+  static const QString charset = QString::fromUtf8("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234567890      ");
+  QRandomGenerator * rng = QRandomGenerator::global();
+  int count = rng->bounded(5, 31);
+  const int size = charset.size();
+  QString text;
+  text.reserve(count);
+  while (count--) {
+    text.append(charset[rng->bounded(size)]);
+  }
+  // Keep the stored value in sync (it is what value() returns while there is no editor)
+  setValue(text);
 }
 
 bool TextParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QStringList list = parseText("text", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
   QString value = list[1];
   _multiline = false;
-  QRegularExpression re("^\\s*(0|1)\\s*,");
-  auto match = re.match(value);
+  // Built once (this function is called for each text parameter each time a filter is loaded)
+  static const QRegularExpression re("^\\s*(0|1)\\s*,");
+  const QRegularExpressionMatch match = re.match(value);
   if (match.hasMatch()) {
     _multiline = (match.captured(1).toInt() == 1);
-    value.replace(re, "");
+    value.remove(0, match.capturedLength(0)); // The match is anchored at the beginning
   }
   _value = _default = unescaped(unquoted(value));
   return true;
@@ -181,8 +192,12 @@ void TextParameter::connectEditor()
   } else if (_lineEdit) {
     connect(_lineEdit, &QLineEdit::editingFinished, this, &TextParameter::onValueChanged);
 #if QT_VERSION_GTE(5, 2, 0)
-    connect(_updateAction, &QAction::triggered, this, &TextParameter::onValueChanged);
+    if (_updateAction) {
+      connect(_updateAction, &QAction::triggered, this, &TextParameter::onValueChanged);
+    }
 #endif
+  } else {
+    return; // Nothing to connect
   }
   _connected = true;
 }
@@ -197,7 +212,9 @@ void TextParameter::disconnectEditor()
   } else if (_lineEdit) {
     _lineEdit->disconnect(this);
 #if QT_VERSION_GTE(5, 2, 0)
-    _updateAction->disconnect(this);
+    if (_updateAction) {
+      _updateAction->disconnect(this);
+    }
 #endif
   }
   _connected = false;

@@ -25,18 +25,32 @@
 #include "FilterParameters/FileParameter.h"
 #include <QApplication>
 #include <QDebug>
+#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontMetrics>
 #include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QRegularExpression>
 #include <QWidget>
+#include <algorithm>
 #include "FilterTextTranslator.h"
 #include "HtmlTranslator.h"
 #include "IconLoader.h"
 #include "Settings.h"
+
+namespace
+{
+
+// Text of the button: the name of the file, elided to fit in the given width.
+// (this was written three times; a negative width, which can happen with a narrow button, is now avoided)
+QString buttonTextForFile(const QString & path, const QFont & font, const int width)
+{
+  const QFontMetrics fm(font);
+  return fm.elidedText(QFileInfo(path).fileName(), Qt::ElideRight, std::max(0, width));
+}
+
+} // namespace
 
 namespace GmicQt
 {
@@ -56,23 +70,22 @@ int FileParameter::size() const
 
 bool FileParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _label;
   delete _button;
+  _label = nullptr;
+  _button = nullptr;
 
-  QString buttonText;
-  if (_value.isEmpty()) {
-    buttonText = "...";
-  } else {
-    int w = widget->contentsRect().width() / 3;
-    QFontMetrics fm(widget->font());
-    buttonText = fm.elidedText(QFileInfo(_value).fileName(), Qt::ElideRight, w);
-  }
+  const QString buttonText = _value.isEmpty() ? QString("...") : buttonTextForFile(_value, widget->font(), widget->contentsRect().width() / 3);
   _button = new QPushButton(buttonText, widget);
   _button->setIcon(IconLoader::load("document-open"));
-  _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
+  _label = new QLabel(_name, widget);
+  _grid->addWidget(_label, row, 0, 1, 1);
   setTextSelectable(_label);
   _grid->addWidget(_button, row, 1, 1, 2);
   connect(_button, &QPushButton::clicked, this, &FileParameter::onButtonPressed);
@@ -96,9 +109,7 @@ void FileParameter::setValue(const QString & value)
     if (_value.isEmpty()) {
       _button->setText("...");
     } else {
-      int width = _button->contentsRect().width() - 10;
-      QFontMetrics fm(_button->font());
-      _button->setText(fm.elidedText(QFileInfo(_value).fileName(), Qt::ElideRight, width));
+      _button->setText(buttonTextForFile(_value, _button->font(), _button->contentsRect().width() - 10));
     }
   }
 }
@@ -121,16 +132,16 @@ bool FileParameter::initFromText(const QString & filterName, const char * text, 
     list = parseText("file", text, textLength);
     _dialogMode = DialogMode::InputOutput;
   }
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
-  QRegularExpression re("^\"(.*)\"$");
-  QRegularExpressionMatch match = re.match(list[1]);
-  if (match.hasMatch()) {
-    list[1] = match.captured(1);
+  // Surrounding double quotes are removed (no regular expression needed, and none is built for each call)
+  QString defaultValue = list[1];
+  if ((defaultValue.size() >= 2) && defaultValue.startsWith(QChar('"')) && defaultValue.endsWith(QChar('"'))) {
+    defaultValue = defaultValue.mid(1, defaultValue.size() - 2);
   }
-  _default = _value = list[1];
+  _default = _value = defaultValue;
   return true;
 }
 
@@ -151,18 +162,22 @@ void FileParameter::onButtonPressed()
     folder = QDir::homePath();
   }
 
+  // The dialog is attached to the window which contains the button. It used to be the first of
+  // QApplication::topLevelWidgets(), which is an arbitrary window and may not exist at all.
+  QWidget * dialogParent = _button ? _button->window() : nullptr;
+
   QString filename;
   const QFileDialog::Options options = Settings::nativeFileDialogs() ? QFileDialog::Options() : QFileDialog::DontUseNativeDialog;
 
   switch (_dialogMode) {
   case DialogMode::Input:
-    filename = QFileDialog::getOpenFileName(QApplication::topLevelWidgets().at(0), tr("Select a file"), folder, QString(), nullptr, options);
+    filename = QFileDialog::getOpenFileName(dialogParent, tr("Select a file"), folder, QString(), nullptr, options);
     break;
   case DialogMode::Output:
-    filename = QFileDialog::getSaveFileName(QApplication::topLevelWidgets().at(0), tr("Select a file"), folder, QString(), nullptr, options);
+    filename = QFileDialog::getSaveFileName(dialogParent, tr("Select a file"), folder, QString(), nullptr, options);
     break;
   case DialogMode::InputOutput: {
-    QFileDialog dialog(dynamic_cast<QWidget *>(parent()), tr("Select a file"), folder, QString());
+    QFileDialog dialog(dialogParent, tr("Select a file"), folder, QString());
     dialog.setOptions(QFileDialog::DontConfirmOverwrite | options);
     dialog.setFileMode(QFileDialog::AnyFile);
     if (!_value.isEmpty()) {
@@ -178,14 +193,15 @@ void FileParameter::onButtonPressed()
 
   if (filename.isEmpty()) {
     _value.clear();
-    _button->setText("...");
+    if (_button) {
+      _button->setText("...");
+    }
   } else {
     _value = filename;
-    QFileInfo info(filename);
-    Settings::FileParameterDefaultPath = info.path();
-    int w = _button->contentsRect().width() - 10;
-    QFontMetrics fm(_button->font());
-    _button->setText(fm.elidedText(QFileInfo(_value).fileName(), Qt::ElideRight, w));
+    Settings::FileParameterDefaultPath = QFileInfo(filename).path();
+    if (_button) {
+      _button->setText(buttonTextForFile(_value, _button->font(), _button->contentsRect().width() - 10));
+    }
   }
   notifyIfRelevant();
 }

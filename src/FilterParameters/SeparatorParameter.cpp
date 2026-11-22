@@ -46,10 +46,14 @@ int SeparatorParameter::size() const
 
 bool SeparatorParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _frame;
+  _frame = nullptr;
   _frame = new QFrame(widget);
   QSizePolicy sizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
   sizePolicy.setHorizontalStretch(0);

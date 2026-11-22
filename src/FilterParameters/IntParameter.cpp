@@ -30,6 +30,8 @@
 #include <QSlider>
 #include <QTimerEvent>
 #include <QWidget>
+#include <algorithm>
+#include <limits>
 #include "FilterParameters/CustomSpinBox.h"
 #include "FilterTextTranslator.h"
 #include "Globals.h"
@@ -60,23 +62,38 @@ int IntParameter::size() const
 
 bool IntParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
+  if (_timerId) { // A pending notification must not refer to the widgets that are about to be replaced
+    killTimer(_timerId);
+    _timerId = 0;
+  }
   delete _spinBox;
   delete _slider;
   delete _label;
+  _spinBox = nullptr;
+  _slider = nullptr;
+  _label = nullptr;
+  // The new widgets are not connected yet (a stale value would make connectSliderSpinBox() return early).
+  _connected = false;
+
   _slider = new QSlider(Qt::Horizontal, widget);
   _slider->setMinimumWidth(SLIDER_MIN_WIDTH);
   _slider->setRange(_min, _max);
   _slider->setValue(_value);
 
-  const int delta = 1 + _max - _min;
+  // 64 bits arithmetic: 1 + _max - _min overflows an int for wide ranges (e.g. int(0,-2000000000,2000000000))
+  const qint64 delta = 1ll + _max - _min;
   if (delta < 20) {
     _slider->setPageStep(1);
   } else {
-    const int fact = delta < 100 ? 10 : delta < 1000 ? 100 : delta < 10000 ? 1000 : 10000;
-    _slider->setPageStep(fact * (delta / fact) / 10);
+    const qint64 fact = delta < 100 ? 10 : delta < 1000 ? 100 : delta < 10000 ? 1000 : 10000;
+    const qint64 pageStep = fact * (delta / fact) / 10;
+    _slider->setPageStep(static_cast<int>(std::max<qint64>(1, std::min<qint64>(pageStep, std::numeric_limits<int>::max()))));
   }
 
   _spinBox = new CustomSpinBox(widget, _min, _max);
@@ -87,19 +104,21 @@ bool IntParameter::addTo(QWidget * widget, int row)
     p.setColor(QPalette::Highlight, QColor(130, 130, 130));
     _slider->setPalette(p);
   }
-  _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
+  _label = new QLabel(_name, widget);
+  _grid->addWidget(_label, row, 0, 1, 1);
   setTextSelectable(_label);
   _grid->addWidget(_slider, row, 1, 1, 1);
   _grid->addWidget(_spinBox, row, 2, 1, 1);
   connectSliderSpinBox();
-  connect(_spinBox, &CustomSpinBox::editingFinished, [this]() { notifyIfRelevant(); });
+  connect(_spinBox, &CustomSpinBox::editingFinished, this, [this]() { notifyIfRelevant(); });
 
   return true;
 }
 
 QString IntParameter::value() const
 {
-  return _spinBox->text();
+  // The widget does not exist until addTo() has been called
+  return _spinBox ? _spinBox->text() : QString::number(_value);
 }
 
 QString IntParameter::defaultValue() const
@@ -109,14 +128,15 @@ QString IntParameter::defaultValue() const
 
 void IntParameter::setValue(const QString & value)
 {
-  bool ok = true;
+  bool ok = false;
   const int k = value.toInt(&ok);
   if (!ok) {
     Logger::warning(QString("IntParameter::setValue(\"%1\"): bad value").arg(value));
     return;
   }
-  _value = k;
-  if (_spinBox) {
+  // Keep the stored value consistent with what the widgets display (they clamp it themselves).
+  _value = std::min(std::max(k, _min), _max);
+  if (_spinBox && _slider) {
     disconnectSliderSpinBox();
     _spinBox->setValue(_value);
     _slider->setValue(_value);
@@ -126,18 +146,33 @@ void IntParameter::setValue(const QString & value)
 
 void IntParameter::reset()
 {
-  disconnectSliderSpinBox();
-  _slider->setValue(_default);
-  _spinBox->setValue(_default);
   _value = _default;
-  connectSliderSpinBox();
+  if (_spinBox && _slider) {
+    disconnectSliderSpinBox();
+    _slider->setValue(_default);
+    _spinBox->setValue(_default);
+    connectSliderSpinBox();
+  }
 }
 
 void IntParameter::randomize()
 {
-  if (acceptRandom()) {
+  if (!acceptRandom() || (_min > _max)) {
+    return;
+  }
+  // QRandomGenerator::bounded() requires highest > lowest, and _max + 1 overflows an int when _max is INT_MAX.
+  // Qt5 only provides bounded(int,int) and bounded(quint32,quint32) (a call with two qint64 is ambiguous),
+  // so the number of values is computed in 64 bits and the generator is called with ints when it fits.
+  QRandomGenerator * generator = QRandomGenerator::global();
+  const qint64 count = static_cast<qint64>(_max) - static_cast<qint64>(_min) + 1; // From 1 to 2^32
+  if (count <= static_cast<qint64>(std::numeric_limits<int>::max())) {
+    _value = _min + generator->bounded(0, static_cast<int>(count));
+  } else {
+    // The range is wider than an int: the modulo bias of a 64 bits value is negligible here
+    _value = static_cast<int>(static_cast<qint64>(_min) + static_cast<qint64>(generator->generate64() % static_cast<quint64>(count)));
+  }
+  if (_spinBox && _slider) {
     disconnectSliderSpinBox();
-    _value = QRandomGenerator::global()->bounded(_min, _max + 1);
     _slider->setValue(_value);
     _spinBox->setValue(_value);
     connectSliderSpinBox();
@@ -147,7 +182,7 @@ void IntParameter::randomize()
 bool IntParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("int", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
@@ -156,33 +191,48 @@ bool IntParameter::initFromText(const QString & filterName, const char * text, i
   if (values.size() != 3) {
     return false;
   }
-  bool ok1, ok2, ok3;
+  bool ok1 = false;
+  bool ok2 = false;
+  bool ok3 = false;
   _default = values[0].toInt(&ok1);
   _min = values[1].toInt(&ok2);
   _max = values[2].toInt(&ok3);
+  if (!(ok1 && ok2 && ok3)) {
+    return false;
+  }
+  // The definition comes from a filter source, which may be wrong: the widgets (and the random
+  // generator) need min <= default <= max.
+  if (_min > _max) {
+    Logger::warning(QString("Int parameter [%1] in filter [%2]: min (%3) is greater than max (%4), values swapped").arg(_name, filterName).arg(_min).arg(_max));
+    std::swap(_min, _max);
+  }
+  if ((_default < _min) || (_default > _max)) {
+    Logger::warning(QString("Int parameter [%1] in filter [%2]: default value %3 is out of range [%4,%5]").arg(_name, filterName).arg(_default).arg(_min).arg(_max));
+    _default = std::min(std::max(_default, _min), _max);
+  }
   _value = _default;
-  return ok1 && ok2 && ok3;
+  return true;
 }
 
 void IntParameter::timerEvent(QTimerEvent * e)
 {
   killTimer(e->timerId());
   _timerId = 0;
-  if (!_spinBox->unfinishedKeyboardEditing()) {
+  if (!_spinBox || !_spinBox->unfinishedKeyboardEditing()) {
     notifyIfRelevant();
   }
 }
 
 void IntParameter::onSliderMoved(int value)
 {
-  if (value != _value) {
+  if (_spinBox && (value != _value)) {
     _spinBox->setValue(_value = value);
   }
 }
 
 void IntParameter::onSliderValueChanged(int value)
 {
-  if (value != _value) {
+  if (_spinBox && (value != _value)) {
     _spinBox->setValue(_value = value);
   }
 }
@@ -190,20 +240,21 @@ void IntParameter::onSliderValueChanged(int value)
 void IntParameter::onSpinBoxChanged(int i)
 {
   _value = i;
-  _slider->setValue(i);
+  if (_slider) {
+    _slider->setValue(i);
+  }
   if (_timerId) {
     killTimer(_timerId);
-  }
-  if (_spinBox->unfinishedKeyboardEditing()) {
     _timerId = 0;
-  } else {
+  }
+  if (!_spinBox || !_spinBox->unfinishedKeyboardEditing()) {
     _timerId = startTimer(UPDATE_DELAY);
   }
 }
 
 void IntParameter::connectSliderSpinBox()
 {
-  if (_connected) {
+  if (_connected || !_slider || !_spinBox) {
     return;
   }
   connect(_slider, &QSlider::sliderMoved, this, &IntParameter::onSliderMoved);
@@ -217,8 +268,12 @@ void IntParameter::disconnectSliderSpinBox()
   if (!_connected) {
     return;
   }
-  _slider->disconnect(this);
-  _spinBox->disconnect(this);
+  if (_slider) {
+    _slider->disconnect(this);
+  }
+  if (_spinBox) {
+    _spinBox->disconnect(this);
+  }
   _connected = false;
 }
 

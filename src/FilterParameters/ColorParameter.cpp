@@ -29,17 +29,38 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QGridLayout>
+#include <QImage>
 #include <QLabel>
 #include <QPainter>
 #include <QPushButton>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QWidget>
+#include <algorithm>
 #include <cstdio>
 #include "FilterTextTranslator.h"
 #include "HtmlTranslator.h"
 #include "Logger.h"
 #include "Settings.h"
+
+namespace
+{
+
+// QColor(r,g,b,a) gives an invalid color (and a Qt warning) when a component is outside [0,255].
+inline int clampedChannel(const int value)
+{
+  return std::min(255, std::max(0, value));
+}
+
+QString colorToString(const QColor & c, const bool withAlpha)
+{
+  if (withAlpha) {
+    return QString("%1,%2,%3,%4").arg(c.red()).arg(c.green()).arg(c.blue()).arg(c.alpha());
+  }
+  return QString("%1,%2,%3").arg(c.red()).arg(c.green()).arg(c.blue());
+}
+
+} // namespace
 
 namespace GmicQt
 {
@@ -70,25 +91,33 @@ int ColorParameter::size() const
 
 bool ColorParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _button;
   delete _label;
+  _button = nullptr;
+  _label = nullptr;
 
   _button = new QPushButton(widget);
   _button->setText("");
 
   QFontMetrics fm(widget->font());
-  QRect r = fm.boundingRect("CLR");
-  _pixmap = QPixmap(r.width(), r.height());
+  const QRect r = fm.boundingRect("CLR");
+  // A null pixmap cannot be painted on
+  _pixmap = QPixmap(std::max(1, r.width()), std::max(1, r.height()));
+  _pixmap.fill(Qt::transparent); // The content of a new pixmap is undefined
   _button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
 
   _button->setIconSize(_pixmap.size());
 
   updateButtonColor();
 
-  _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
+  _label = new QLabel(_name, widget);
+  _grid->addWidget(_label, row, 0, 1, 1);
   setTextSelectable(_label);
   _grid->addWidget(_button, row, 1, 1, 1);
   connect(_button, &QPushButton::clicked, this, &ColorParameter::onButtonPressed);
@@ -97,53 +126,48 @@ bool ColorParameter::addTo(QWidget * widget, int row)
 
 QString ColorParameter::value() const
 {
-  const QColor & c = _value;
-  if (_alphaChannel) {
-    return QString("%1,%2,%3,%4").arg(c.red()).arg(c.green()).arg(c.blue()).arg(c.alpha());
-  }
-  return QString("%1,%2,%3").arg(c.red()).arg(c.green()).arg(c.blue());
+  return colorToString(_value, _alphaChannel);
 }
 
 QString ColorParameter::defaultValue() const
 {
-  const QColor & c = _default;
-  if (_alphaChannel) {
-    return QString("%1,%2,%3,%4").arg(c.red()).arg(c.green()).arg(c.blue()).arg(c.alpha());
-  }
-  return QString("%1,%2,%3").arg(c.red()).arg(c.green()).arg(c.blue());
+  return colorToString(_default, _alphaChannel);
 }
 
 void ColorParameter::setValue(const QString & value)
 {
-  QStringList list = value.split(",");
+  const QStringList list = value.split(",");
   if ((list.size() != 3) && (list.size() != 4)) {
     return;
   }
+  // A value with a wrong channel used to be applied anyway (with 0 for the channel): it is now ignored.
   bool ok = false;
   const int red = list[0].toInt(&ok);
   if (!ok) {
     Logger::warning(QString("ColorParameter::setValue(\"%1\"): bad red channel").arg(value));
+    return;
   }
   const int green = list[1].toInt(&ok);
   if (!ok) {
     Logger::warning(QString("ColorParameter::setValue(\"%1\"): bad green channel").arg(value));
+    return;
   }
   const int blue = list[2].toInt(&ok);
   if (!ok) {
     Logger::warning(QString("ColorParameter::setValue(\"%1\"): bad blue channel").arg(value));
+    return;
   }
   if ((list.size() == 4) && _alphaChannel) {
     const int alpha = list[3].toInt(&ok);
     if (!ok) {
       Logger::warning(QString("ColorParameter::setValue(\"%1\"): bad alpha channel").arg(value));
+      return;
     }
-    _value = QColor(red, green, blue, alpha);
+    _value = QColor(clampedChannel(red), clampedChannel(green), clampedChannel(blue), clampedChannel(alpha));
   } else {
-    _value = QColor(red, green, blue);
+    _value = QColor(clampedChannel(red), clampedChannel(green), clampedChannel(blue));
   }
-  if (_button) {
-    updateButtonColor();
-  }
+  updateButtonColor();
 }
 
 void ColorParameter::reset()
@@ -167,14 +191,16 @@ void ColorParameter::randomize()
 bool ColorParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("color", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
 
   // color(#e9cc00) and color(#e9cc00ff)
+  // (the expression is built once: this function is called for each color parameter each time a filter is loaded)
+  static const QRegularExpression hexadecimalColor("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$");
   const QString trimmed = list[1].trimmed();
-  if (QRegularExpression("^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$").match(trimmed).hasMatch()) {
+  if (hexadecimalColor.match(trimmed).hasMatch()) {
     _default = QColor(trimmed.left(7));
     if (trimmed.length() == 9) {
       _alphaChannel = true;
@@ -188,21 +214,27 @@ bool ColorParameter::initFromText(const QString & filterName, const char * text,
   }
 
   // color(120,100,10) and color(120,100,10,128)
-  QList<QString> channels = list[1].split(",");
+  const QList<QString> channels = list[1].split(",");
   const int n = channels.size();
+  if (n > 4) {
+    Logger::warning(QString("Color parameter [%1] in filter [%2]: too many components (%3), extra ones are ignored").arg(_name, filterName).arg(n));
+  }
   bool okR = true, okG = true, okB = true, okA = true;
-  int r = (n > 0) ? channels[0].toInt(&okR) : 0;
-  int g = (n >= 2) ? channels[1].toInt(&okG) : r;
-  int b = (n >= 3) ? channels[2].toInt(&okB) : (n == 1) ? r : 0;
-  if (channels.size() == 4) {
-    int a = channels[3].toInt(&okA);
+  const int r = clampedChannel((n > 0) ? channels[0].toInt(&okR) : 0);
+  const int g = clampedChannel((n >= 2) ? channels[1].toInt(&okG) : r);
+  const int b = clampedChannel((n >= 3) ? channels[2].toInt(&okB) : (n == 1) ? r : 0);
+  if (n == 4) {
+    const int a = clampedChannel(channels[3].toInt(&okA));
     _default = _value = QColor(r, g, b, a);
     _alphaChannel = true;
   } else {
     _default = _value = QColor(r, g, b);
+    _alphaChannel = false;
   }
   if (okR && okG && okB && okA) {
-    _size = channels.size();
+    // The size is the number of values returned by value(), which is always 3 or 4. It used to be
+    // channels.size(), which is wrong for a definition with 1, 2 or more than 4 components.
+    _size = 3 + _alphaChannel;
     return true;
   }
   return false;
@@ -222,14 +254,21 @@ void ColorParameter::onButtonPressed()
 
 void ColorParameter::updateButtonColor()
 {
+  // There is no button until addTo() has been called (and a null pixmap cannot be painted on)
+  if (!_button || _pixmap.isNull()) {
+    return;
+  }
   QPainter painter(&_pixmap);
-  QColor color(_value);
+  const QColor color(_value);
   if (_alphaChannel) {
-    painter.drawImage(0, 0, QImage(":resources/transparency.png"));
+    // Loaded once instead of each time the color changes
+    static const QImage transparency(":resources/transparency.png");
+    painter.drawImage(0, 0, transparency);
   }
   painter.setBrush(color);
   painter.setPen(Qt::black);
   painter.drawRect(0, 0, _pixmap.width() - 1, _pixmap.height() - 1);
+  painter.end();
   _button->setIcon(_pixmap);
 }
 

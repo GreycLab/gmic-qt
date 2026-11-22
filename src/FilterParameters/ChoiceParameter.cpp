@@ -27,13 +27,31 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QRandomGenerator>
-#include <QRegularExpression>
 #include <QStringList>
 #include <QWidget>
 #include "Common.h"
 #include "FilterTextTranslator.h"
 #include "HtmlTranslator.h"
 #include "Logger.h"
+
+namespace
+{
+
+// Removes the surrounding spaces, then one leading and one trailing double quote (if any).
+// (Built once per item: this used to build two QRegularExpression objects for each choice.)
+QString unquotedChoice(const QString & text)
+{
+  QString result = text.trimmed();
+  if (result.startsWith(QChar('"'))) {
+    result.remove(0, 1);
+  }
+  if (result.endsWith(QChar('"'))) {
+    result.chop(1);
+  }
+  return result;
+}
+
+} // namespace
 
 namespace GmicQt
 {
@@ -52,17 +70,27 @@ int ChoiceParameter::size() const
 
 bool ChoiceParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _comboBox;
   delete _label;
+  _comboBox = nullptr;
+  _label = nullptr;
+  // The new combo box is not connected yet. Without this, a second call to addTo() left
+  // _connected set to true, so connectComboBox() returned early and the new widget never
+  // notified any change.
+  _connected = false;
 
   _comboBox = new QComboBox(widget);
   _comboBox->addItems(_choices);
   _comboBox->setCurrentIndex(_value);
 
-  _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
+  _label = new QLabel(_name, widget);
+  _grid->addWidget(_label, row, 0, 1, 1);
   setTextSelectable(_label);
   _grid->addWidget(_comboBox, row, 1, 1, 2);
   connectComboBox();
@@ -71,22 +99,23 @@ bool ChoiceParameter::addTo(QWidget * widget, int row)
 
 QString ChoiceParameter::value() const
 {
-  return QString("%1").arg(_comboBox->currentIndex());
+  // The widget may not exist (yet), and an empty combo box has a current index of -1.
+  const int index = _comboBox ? _comboBox->currentIndex() : _value;
+  return QString::number(qMax(0, index));
 }
 
 QString ChoiceParameter::defaultValue() const
 {
-  return QString("%1").arg(_default);
+  return QString::number(_default);
 }
 
 void ChoiceParameter::setValue(const QString & value)
 {
-  bool ok = true;
+  bool ok = false;
   const int k = value.toInt(&ok);
-  if (!ok || (k < 0)) {
-    return;
-  }
-  if (_comboBox && (k >= _comboBox->count())) {
+  // The check is made against the list of choices, so that an out of range value is
+  // also refused when the widget does not exist yet.
+  if (!ok || (k < 0) || (k >= _choices.size())) {
     return;
   }
   _value = k;
@@ -99,17 +128,24 @@ void ChoiceParameter::setValue(const QString & value)
 
 void ChoiceParameter::reset()
 {
-  disconnectComboBox();
-  _comboBox->setCurrentIndex(_default);
   _value = _default;
-  connectComboBox();
+  if (_comboBox) {
+    disconnectComboBox();
+    _comboBox->setCurrentIndex(_default);
+    connectComboBox();
+  }
 }
 
 void ChoiceParameter::randomize()
 {
-  if (acceptRandom()) {
+  const int count = _choices.size();
+  // bounded(0, 0) is undefined: there must be at least one choice
+  if (!acceptRandom() || (count <= 0)) {
+    return;
+  }
+  _value = QRandomGenerator::global()->bounded(0, count);
+  if (_comboBox) {
     disconnectComboBox();
-    _value = QRandomGenerator::global()->bounded(0, _comboBox->count());
     _comboBox->setCurrentIndex(_value);
     connectComboBox();
   }
@@ -118,26 +154,29 @@ void ChoiceParameter::randomize()
 bool ChoiceParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QStringList list = parseText("choice", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
   _choices = list[1].split(QChar(','));
-  bool ok;
   if (_choices.isEmpty()) {
     return false;
   }
-  _default = _choices[0].toInt(&ok);
+  bool ok = false;
+  _default = _choices.front().trimmed().toInt(&ok);
   if (!ok) {
     _default = 0;
   } else {
     _choices.pop_front();
   }
-  QList<QString>::iterator it = _choices.begin();
-  while (it != _choices.end()) {
-    *it = it->trimmed().remove(QRegularExpression("^\"")).remove(QRegularExpression("\"$"));
-    *it = HtmlTranslator::html2txt(FilterTextTranslator::translate(*it, filterName));
-    ++it;
+  for (QString & choice : _choices) {
+    choice = HtmlTranslator::html2txt(FilterTextTranslator::translate(unquotedChoice(choice), filterName));
+  }
+  // The default value is an index in the list of choices: a value read from a filter definition
+  // may be negative or too large, which used to leave the combo box without any selection (index -1).
+  if ((_default < 0) || (_default >= _choices.size())) {
+    Logger::warning(QString("Choice parameter [%1] in filter [%2]: default value %3 is out of range, 0 is used").arg(_name, filterName).arg(_default));
+    _default = 0;
   }
   _value = _default;
   return true;
@@ -145,13 +184,16 @@ bool ChoiceParameter::initFromText(const QString & filterName, const char * text
 
 void ChoiceParameter::onComboBoxIndexChanged(int i)
 {
+  if (i < 0) { // The combo box has been cleared: there is no valid value to remember
+    return;
+  }
   _value = i;
   notifyIfRelevant();
 }
 
 void ChoiceParameter::connectComboBox()
 {
-  if (_connected) {
+  if (_connected || !_comboBox) {
     return;
   }
   connect(_comboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChoiceParameter::onComboBoxIndexChanged);
@@ -160,7 +202,7 @@ void ChoiceParameter::connectComboBox()
 
 void ChoiceParameter::disconnectComboBox()
 {
-  if (!_connected) {
+  if (!_connected || !_comboBox) {
     return;
   }
   _comboBox->disconnect(this);

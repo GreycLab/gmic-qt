@@ -24,14 +24,15 @@
  */
 #include "FilterParameters/FolderParameter.h"
 #include <QDebug>
+#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFontMetrics>
 #include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QRegularExpression>
 #include <QWidget>
+#include <algorithm>
 #include "Common.h"
 #include "FilterTextTranslator.h"
 #include "HtmlTranslator.h"
@@ -56,15 +57,21 @@ int FolderParameter::size() const
 
 bool FolderParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _label;
   delete _button;
+  _label = nullptr;
+  _button = nullptr;
 
   _button = new QPushButton(widget);
   _button->setIcon(IconLoader::load("folder"));
-  _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
+  _label = new QLabel(_name, widget);
+  _grid->addWidget(_label, row, 0, 1, 1);
   setTextSelectable(_label);
   _grid->addWidget(_button, row, 1, 1, 2);
   setValue(_value);
@@ -90,12 +97,11 @@ void FolderParameter::setValue(const QString & value)
   } else if (!QFileInfo(_value).isDir()) {
     _value = QDir::homePath();
   }
-  QDir dir(_value);
-  QDir abs(dir.absolutePath());
   if (_button) {
-    int width = _button->contentsRect().width() - 10;
-    QFontMetrics fm(_button->font());
-    _button->setText(fm.elidedText(abs.dirName(), Qt::ElideRight, width));
+    const QDir abs(QDir(_value).absolutePath());
+    const QFontMetrics fm(_button->font());
+    // The width may be negative for a very narrow button
+    _button->setText(fm.elidedText(abs.dirName(), Qt::ElideRight, std::max(0, _button->contentsRect().width() - 10)));
   }
 }
 
@@ -107,20 +113,20 @@ void FolderParameter::reset()
 bool FolderParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("folder", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
-  QRegularExpression re("^\".*\"$");
-  if (re.match(list[1]).hasMatch()) {
-    list[1].chop(1);
-    list[1].remove(0, 1);
+  // Surrounding double quotes are removed (no regular expression needed, and none is built for each call)
+  QString defaultValue = list[1];
+  if ((defaultValue.size() >= 2) && defaultValue.startsWith(QChar('"')) && defaultValue.endsWith(QChar('"'))) {
+    defaultValue = defaultValue.mid(1, defaultValue.size() - 2);
   }
-  if (list[1].isEmpty()) {
+  if (defaultValue.isEmpty()) {
     _default.clear();
     _value = Settings::FolderParameterDefaultValue;
   } else {
-    _default = _value = list[1];
+    _default = _value = defaultValue;
   }
   return true;
 }
@@ -132,10 +138,12 @@ bool FolderParameter::isQuoted() const
 
 void FolderParameter::onButtonPressed()
 {
-  QString oldValue = _value;
+  const QString oldValue = _value;
   QFileDialog::Options options = Settings::nativeFileDialogs() ? QFileDialog::Options() : QFileDialog::DontUseNativeDialog;
   options |= QFileDialog::ShowDirsOnly;
-  QString path = QFileDialog::getExistingDirectory(dynamic_cast<QWidget *>(parent()), tr("Select a folder"), _value, options);
+  // The dialog is attached to the window which contains the button
+  QWidget * dialogParent = _button ? _button->window() : dynamic_cast<QWidget *>(parent());
+  const QString path = QFileDialog::getExistingDirectory(dialogParent, tr("Select a folder"), _value, options);
   if (path.isEmpty()) {
     setValue(oldValue);
   } else {

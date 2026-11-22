@@ -56,11 +56,20 @@ int BoolParameter::size() const
 
 bool BoolParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) { // Without this test, a release build would dereference a null pointer below
+    return false;
+  }
   _row = row;
   delete _checkBox;
   delete _label;
+  _checkBox = nullptr;
+  _label = nullptr;
+  // The new check box is not connected yet. Without this, a second call to addTo() left
+  // _connected set to true, so connectCheckBox() returned early and nothing was ever notified.
+  _connected = false;
+
   _checkBox = new QCheckBox(widget);
   _checkBox->setChecked(_value);
   _label = new QLabel(_name, widget);
@@ -98,17 +107,16 @@ void BoolParameter::setValue(const QString & value)
 
 void BoolParameter::reset()
 {
-  _checkBox->setChecked(_default);
-  _value = _default;
+  // There is no check box until addTo() has been called.
+  // As for the other parameters, the widget is updated silently (changing a connected check box
+  // used to emit valueChanged() for each parameter which was not already at its default value).
+  setValue(_default ? QString("1") : QString("0"));
 }
 
 void BoolParameter::randomize()
 {
   if (acceptRandom()) {
-    _value = QRandomGenerator::global()->bounded(0, 2);
-    disconnectCheckBox();
-    _checkBox->setChecked(_value);
-    connectCheckBox();
+    setValue(QRandomGenerator::global()->bounded(0, 2) ? QString("1") : QString("0"));
   }
 }
 
@@ -120,7 +128,7 @@ void BoolParameter::onCheckBoxChanged(bool on)
 
 void BoolParameter::connectCheckBox()
 {
-  if (_connected) {
+  if (_connected || !_checkBox) {
     return;
   }
   connect(_checkBox, &QCheckBox::toggled, this, &BoolParameter::onCheckBoxChanged);
@@ -129,7 +137,7 @@ void BoolParameter::connectCheckBox()
 
 void BoolParameter::disconnectCheckBox()
 {
-  if (!_connected) {
+  if (!_connected || !_checkBox) {
     return;
   }
   _checkBox->disconnect(this);
@@ -139,7 +147,7 @@ void BoolParameter::disconnectCheckBox()
 bool BoolParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("bool", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) {
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
