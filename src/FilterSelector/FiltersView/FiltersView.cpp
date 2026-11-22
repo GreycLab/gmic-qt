@@ -431,7 +431,7 @@ void FiltersView::onCustomContextMenu(const QPoint & point)
   }
   onItemClicked(index);
   if (item->isFave()) {
-    _faveContextMenu->deleteLater();
+    if (_faveContextMenu) _faveContextMenu->deleteLater();
     _faveContextMenu = itemContextMenu(MenuType::Fave, item);
     _faveContextMenu->exec(ui->treeView->mapToGlobal(point));
   } else {
@@ -728,6 +728,7 @@ void FiltersView::toggleItemTag(FilterTreeItem * item, TagColor color)
     return;
   }
   QStandardItem * folder = item->parent();
+  if (!folder) folder = _model.invisibleRootItem();
   folder->removeRow(item->row());
   while (folder && (folder != _model.invisibleRootItem()) && (folder->rowCount() == 0)) {
     QStandardItem * folderParent = folder->parent();
