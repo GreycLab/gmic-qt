@@ -25,6 +25,7 @@
 #include "FilterThread.h"
 #include <QDebug>
 #include <QRegularExpression>
+#include <exception>
 #include <iostream>
 #include "FilterParameters/AbstractParameter.h"
 #include "GmicStdlib.h"
@@ -92,7 +93,7 @@ gmic_library::gmic_image<char> & FilterThread::persistentMemoryOutput()
 // Output list is either :
 // - A list of 'strings' (terminated by null character), if output_visibility==false;
 // - Or a list of 'visibilities' (single char in { 0,'0','1','2' }, **not** terminated by null character).
-gmic_list<char> status2Items(const char *status, const bool output_visibility) {
+static gmic_list<char> status2Items(const char *status, const bool output_visibility) {
   if (!status || *status!=gmic_lbrace) return gmic_list<char>();
   const int len = (int)std::strlen(status);
   gmic_list<char> out;
@@ -136,7 +137,7 @@ QStringList FilterThread::status2StringList(QString status)
   QByteArray ba = status.toLocal8Bit();
   gmic_list<char> clist = status2Items(ba.constData(),false);
   QStringList qlist;
-  cimglist_for(clist,l) qlist<<QString(clist[l].data());
+  cimglist_for(clist,l) qlist<<QString::fromLocal8Bit(clist[l].data());
   return qlist;
 }
 
@@ -214,7 +215,8 @@ void FilterThread::run()
     fullCommandLine = commandFromOutputMessageMode(Settings::outputMessageMode());
     appendWithSpace(fullCommandLine, _command);
     appendWithSpace(fullCommandLine, _arguments);
-    _gmicAbort = false;
+    // Note: _gmicAbort is initialized by the constructor and must not be reset here, otherwise an
+    // abortGmic() call made between start() and the actual execution of run() would be lost.
     _gmicProgress = -1;
     Logger::log(fullCommandLine, _logSuffix, true);
     gmic gmicInstance(_environment.isEmpty() ? nullptr : QString("%1").arg(_environment).toLocal8Bit().constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
@@ -236,6 +238,19 @@ void FilterThread::run()
     const char * message = e.what();
     _errorMessage = message;
     Logger::error(QString("When running command '%1', this error occurred:\n%2").arg(fullCommandLine).arg(message), true);
+    _failed = true;
+  } catch (std::exception & e) {
+    // An exception escaping from run() would terminate the whole host application.
+    _images->assign();
+    _imageNames->assign();
+    _errorMessage = e.what();
+    Logger::error(QString("When running command '%1', this error occurred:\n%2").arg(fullCommandLine).arg(_errorMessage), true);
+    _failed = true;
+  } catch (...) {
+    _images->assign();
+    _imageNames->assign();
+    _errorMessage = "Unknown error";
+    Logger::error(QString("When running command '%1', an unknown error occurred.").arg(fullCommandLine), true);
     _failed = true;
   }
 }
