@@ -27,6 +27,8 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QVBoxLayout>
+#include <algorithm>
+#include <cstddef>
 #include "Common.h"
 #include "FilterParameters/AbstractParameter.h"
 #include "FilterParameters/PointParameter.h"
@@ -58,8 +60,9 @@ QVector<AbstractParameter *> FilterParametersWidget::buildParameters(const QStri
                                                                      QString * error)
 {
   QVector<AbstractParameter *> result;
-  QByteArray rawText = parameters.toUtf8();
+  const QByteArray rawText = parameters.toUtf8();
   const char * cstr = rawText.constData();
+  const char * const textEnd = cstr + rawText.size();
   int length = 0;
   int localActualParameterCount = 0;
   bool localAcceptRandom = false;
@@ -71,6 +74,13 @@ QVector<AbstractParameter *> FilterParametersWidget::buildParameters(const QStri
   AbstractParameter * parameter;
   do {
     parameter = AbstractParameter::createFromText(filterName, cstr, length, localError, parent);
+    if (parameter && (length <= 0)) {
+      // A parameter which consumes no text would make this loop endless
+      delete parameter;
+      parameter = nullptr;
+      localError = QString("Invalid parameter definition (no text consumed)");
+      break;
+    }
     if (parameter) {
       result.push_back(parameter);
       if (parameter->isActualParameter()) {
@@ -80,7 +90,8 @@ QVector<AbstractParameter *> FilterParametersWidget::buildParameters(const QStri
         localAcceptRandom = true;
       }
     }
-    cstr += length;
+    // Never move past the end of the text
+    cstr += std::min<std::ptrdiff_t>(length, textEnd - cstr);
   } while (parameter && localError.isEmpty());
 
   if (!localError.isEmpty()) {
@@ -147,9 +158,13 @@ QStringList FilterParametersWidget::defaultParameterList(const QString & paramet
 
 QVector<bool> FilterParametersWidget::quotedParameters(const QVector<AbstractParameter *> & parameters)
 {
+  // One flag per *actual* parameter, as in defaultParameterList(): the flags are used together with
+  // lists of values (e.g. gmic status) which do not include notes, separators, links, buttons...
   QVector<bool> result;
   for (AbstractParameter * p : parameters) {
-    result.push_back(p->isQuoted());
+    if (p->isActualParameter()) {
+      result.push_back(p->isQuoted());
+    }
   }
   return result;
 }
@@ -211,9 +226,6 @@ bool FilterParametersWidget::build(const QString & name, const QString & hash, c
 
   if (_actualParametersCount != visibilityStates.size()) {
     Logger::warning(QString("Parameters/SetVisibilities: Wrong number of values %1 (expecting %2)").arg(visibilityStates.size()).arg(_actualParametersCount));
-  }
-
-  if (_actualParametersCount != visibilityStates.size()) {
     applyDefaultVisibilityStates();
   } else {
     setVisibilityStates(visibilityStates);
@@ -279,6 +291,8 @@ void FilterParametersWidget::setNoFilter(const QString & message)
 
   _valueString.clear();
   _filterHash.clear();
+  _hasKeypoints = false;
+  _acceptRandom = false;
 }
 
 FilterParametersWidget::~FilterParametersWidget()
@@ -338,7 +352,9 @@ void FilterParametersWidget::setVisibilityStates(QList<int> states)
     for (int n = 0; n < _parameters.size(); ++n) {
       AbstractParameter * parameter = _parameters[n];
       if (parameter->isActualParameter()) {
-        newVisibilityStates[n] = static_cast<AbstractParameter::VisibilityState>(*itState);
+        const int value = *itState;
+        const bool valid = (value >= static_cast<int>(AbstractParameter::VisibilityState::Unspecified)) && (value <= static_cast<int>(AbstractParameter::VisibilityState::Visible));
+        newVisibilityStates[n] = valid ? static_cast<AbstractParameter::VisibilityState>(value) : AbstractParameter::VisibilityState::Unspecified;
         ++itState;
       }
     }
@@ -379,7 +395,7 @@ QList<int> FilterParametersWidget::visibilityStates()
   QList<int> states;
   for (const AbstractParameter * const param : _parameters) {
     if (param->isActualParameter()) {
-      states.push_back((int)param->visibilityState());
+      states.push_back(static_cast<int>(param->visibilityState()));
     }
   }
   return states;
@@ -390,7 +406,7 @@ QList<int> FilterParametersWidget::defaultVisibilityStates()
   QList<int> states;
   for (AbstractParameter * param : _parameters) {
     if (param->isActualParameter()) {
-      states.push_back((int)param->defaultVisibilityState());
+      states.push_back(static_cast<int>(param->defaultVisibilityState()));
     }
   }
   return states;
@@ -559,3 +575,5 @@ const QVector<bool> & FilterParametersWidget::quotedParameters() const
 }
 
 } // namespace GmicQt
+
+
