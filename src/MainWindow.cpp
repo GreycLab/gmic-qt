@@ -129,6 +129,10 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent), ui(new Ui::MainW
   closeShortcut->setContext(Qt::ApplicationShortcut);
   connect(closeShortcut, &QShortcut::activated, this, &MainWindow::close);
 
+  QShortcut * quitShortcut = new QShortcut(QKeySequence("Ctrl+Q"), this);
+  quitShortcut->setContext(Qt::ApplicationShortcut);
+  connect(quitShortcut, &QShortcut::activated, this, &MainWindow::close);
+
   QShortcut * previewTypeShortcut = new QShortcut(QKeySequence("Ctrl+Shift+P"), this);
   previewTypeShortcut->setContext(Qt::ApplicationShortcut);
   connect(previewTypeShortcut, &QShortcut::activated, this, &MainWindow::switchPreviewType);
@@ -1578,5 +1582,3 @@ void MainWindow::closeEvent(QCloseEvent * e)
 }
 
 } // namespace GmicQt
-
-
