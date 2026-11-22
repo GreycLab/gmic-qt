@@ -29,6 +29,7 @@
 #include <QDebug>
 #include <QPointF>
 #include <QSize>
+#include <algorithm>
 #include <cmath>
 #include <deque>
 #include "Common.h"
@@ -47,12 +48,12 @@ public:
     float radius; /* A negative value is a percentage of the preview diagonal */
     bool keepOpacityWhenSelected;
 
-    Keypoint(float x, float y, QColor color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
-    Keypoint(QPointF point, QColor color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
-    Keypoint(QColor color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
+    Keypoint(float x, float y, const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
+    Keypoint(const QPointF & point, const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
+    Keypoint(const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
     bool isNaN() const;
     Keypoint & setNaN();
-    inline void setPosition(float x, float y);
+    inline void setPosition(float newX, float newY);
     inline void setPosition(const QPointF & p);
     static const float DefaultRadius;
 
@@ -61,8 +62,11 @@ public:
 
   KeypointList();
   void add(const Keypoint & keypoint);
-  bool isEmpty();
+  bool isEmpty() const;
   void clear();
+
+  // The three accessors below return a neutral value (NaN position, invalid color, false)
+  // when 'n' is not a valid index.
   QPointF position(int n) const;
   QColor color(int n) const;
   bool isRemovable(int n) const;
@@ -76,13 +80,39 @@ public:
   typedef std::deque<Keypoint>::const_reference const_reference;
 
   size_type size() const { return _keypoints.size(); }
-  reference operator[](size_type index) { return _keypoints[index]; }
-  const_reference operator[](size_type index) const { return _keypoints[index]; }
-  void pop_front() { _keypoints.pop_front(); }
-  const Keypoint & front() { return _keypoints.front(); }
-  const Keypoint & front() const { return _keypoints.front(); }
+  // The index must be valid (checked in debug builds only).
+  reference operator[](size_type index)
+  {
+    Q_ASSERT(index < _keypoints.size());
+    return _keypoints[index];
+  }
+  const_reference operator[](size_type index) const
+  {
+    Q_ASSERT(index < _keypoints.size());
+    return _keypoints[index];
+  }
+  // Does nothing on an empty list.
+  void pop_front()
+  {
+    if (!_keypoints.empty()) {
+      _keypoints.pop_front();
+    }
+  }
+  // The list must not be empty (checked in debug builds only).
+  const Keypoint & front()
+  {
+    Q_ASSERT(!_keypoints.empty());
+    return _keypoints.front();
+  }
+  const Keypoint & front() const
+  {
+    Q_ASSERT(!_keypoints.empty());
+    return _keypoints.front();
+  }
   iterator begin() { return _keypoints.begin(); }
   iterator end() { return _keypoints.end(); }
+  const_iterator begin() const { return _keypoints.cbegin(); }
+  const_iterator end() const { return _keypoints.cend(); }
   const_iterator cbegin() const { return _keypoints.cbegin(); }
   const_iterator cend() const { return _keypoints.cend(); }
   reverse_iterator rbegin() { return _keypoints.rbegin(); }
@@ -93,28 +123,44 @@ public:
   const_reverse_iterator crend() const { return _keypoints.crend(); }
 
 private:
+  bool isValidIndex(int n) const;
   std::deque<Keypoint> _keypoints;
 };
 
-void KeypointList::Keypoint::setPosition(float x, float y)
+void KeypointList::Keypoint::setPosition(float newX, float newY)
 {
-  KeypointList::Keypoint::x = x;
-  KeypointList::Keypoint::y = y;
+  x = newX;
+  y = newY;
 }
 
 void KeypointList::Keypoint::setPosition(const QPointF & point)
 {
-  KeypointList::Keypoint::x = (float)point.x();
-  KeypointList::Keypoint::y = (float)point.y();
+  x = static_cast<float>(point.x());
+  y = static_cast<float>(point.y());
 }
 
 int KeypointList::Keypoint::actualRadiusFromPreviewSize(const QSize & size) const
 {
-  if (radius >= 0) {
-    return static_cast<int>(radius);
-  } else {
-    return std::max(2, static_cast<int>(std::round(-static_cast<double>(radius) * (std::sqrt(size.width() * size.width() + size.height() * size.height())) / 100.0)));
+  // Upper bound (in pixels), so that neither the conversions to int below, nor
+  // computations such as 2 * radius in the callers, can ever overflow.
+  static const double MaxRadius = 100000.0;
+  const double r = static_cast<double>(radius);
+  if (r >= 0.0) {
+    return static_cast<int>(std::min(r, MaxRadius));
   }
+  if (r < 0.0) {
+    // Percentage of the preview diagonal. The squares are computed in double precision:
+    // with ints, width * width + height * height overflows for a width above ~46000 pixels.
+    const double w = static_cast<double>(size.width());
+    const double h = static_cast<double>(size.height());
+    const double value = -r * std::sqrt(w * w + h * h) / 100.0;
+    if (!(value < MaxRadius)) { // Also true for NaN
+      return static_cast<int>(MaxRadius);
+    }
+    return std::max(2, static_cast<int>(std::round(value)));
+  }
+  // Not a number
+  return static_cast<int>(DefaultRadius);
 }
 
 } // namespace GmicQt
