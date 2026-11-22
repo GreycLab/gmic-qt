@@ -958,30 +958,30 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
 #endif
           img.assign();
         }
-        const unsigned int max_width = bottom_right.x - top_left.x;
-        const unsigned int max_height = bottom_right.y - top_left.y;
-        const unsigned int Mw = std::max(image_width, max_width);
-        const unsigned int Mh = std::max(image_height, max_height);
-        if (Mw && Mh) {
-          gimp_image_resize(gmic_qt_gimp_image_id, Mw, Mh, -top_left.x, -top_left.y);
-        }
+      }
+      const unsigned int max_width = bottom_right.x - top_left.x;
+      const unsigned int max_height = bottom_right.y - top_left.y;
+      const unsigned int Mw = std::max(image_width, max_width);
+      const unsigned int Mh = std::max(image_height, max_height);
+      if (Mw && Mh) {
+        gimp_image_resize(gmic_qt_gimp_image_id, Mw, Mh, -top_left.x, -top_left.y);
+      }
 
 #if GIMP_CHECK_VERSION(3, 0, 0)
-        GimpLayer * selected_layer[2] = { 0 };
-        if (outputMode == GmicQt::OutputMode::NewLayers) {
-          selected_layer[0] = active_layer_id;
-        } else {
-          selected_layer[0] = top_layer_id;
-        }
-        gimp_image_set_selected_layers(gmic_qt_gimp_image_id, (const GimpLayer **)selected_layer);
-#else
-        if (outputMode == GmicQt::OutputMode::NewLayers) {
-          gimp_image_set_active_layer(gmic_qt_gimp_image_id, active_layer_id);
-        } else {
-          gimp_image_set_active_layer(gmic_qt_gimp_image_id, top_layer_id);
-        }
-#endif
+      GimpLayer * selected_layer[2] = { 0 };
+      if (outputMode == GmicQt::OutputMode::NewLayers) {
+        selected_layer[0] = active_layer_id;
+      } else {
+        selected_layer[0] = top_layer_id;
       }
+      gimp_image_set_selected_layers(gmic_qt_gimp_image_id, (const GimpLayer **)selected_layer);
+#else
+      if (outputMode == GmicQt::OutputMode::NewLayers) {
+        gimp_image_set_active_layer(gmic_qt_gimp_image_id, active_layer_id);
+      } else {
+        gimp_image_set_active_layer(gmic_qt_gimp_image_id, top_layer_id);
+      }
+#endif
       gimp_image_undo_group_end(gmic_qt_gimp_image_id);
     }
   } else if (outputMode == GmicQt::OutputMode::NewImage && images.size()) {
