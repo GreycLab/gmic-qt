@@ -24,14 +24,20 @@
  */
 #include "Updater.h"
 #include <QByteArray>
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QDebug>
 #include <QFile>
 #include <QFileInfo>
+#include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QTextStream>
+#include <QTimer>
 #include <QUrl>
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
+#include <limits>
 #include "Common.h"
 #include "GmicStdlib.h"
 #include "Logger.h"
@@ -39,6 +45,30 @@
 #include "Settings.h"
 #include "Utils.h"
 #include "gmic.h"
+
+namespace
+{
+// Maximum size of a filters source file (downloaded, or read from the disk), possibly CImg-compressed.
+// The official definitions are a few megabytes at most: anything much larger is refused.
+const qint64 MaxSourceFileSize = 64ll << 20;
+
+// Maximum size of a source file once decompressed.
+const std::size_t MaxDecompressedSize = static_cast<std::size_t>(256) << 20;
+
+// Maximum size of the full filters library (concatenation of all the sources). It must also stay
+// far below the size limit of a QByteArray.
+const qint64 MaxFullStdlibSize = 256ll << 20;
+
+// Upper bound for the download timeout (the value is multiplied by 1000 to get milliseconds).
+const int MaxDownloadTimeoutSeconds = 24 * 3600;
+
+// Maximum number of bytes of a failed reply that are written to the log.
+const int MaxLoggedReplyBytes = 4096;
+
+// Dynamic properties used to tell why a reply was aborted.
+const char * const TooLargeProperty = "gmic_qt_download_too_large";
+const char * const TimedOutProperty = "gmic_qt_download_timed_out";
+} // namespace
 
 namespace GmicQt
 {
@@ -51,6 +81,11 @@ Updater::Updater(QObject * parent) : QObject(parent)
 {
   _networkAccessManager = nullptr;
   _someNetworkUpdatesAchieved = false;
+  // A single timer is shared by all the updates, so that the timeout of an update which is already
+  // over cannot abort the downloads of a later one.
+  _timeoutTimer = new QTimer(this);
+  _timeoutTimer->setSingleShot(true);
+  connect(_timeoutTimer, &QTimer::timeout, this, &Updater::cancelAllPendingDownloads);
 }
 
 bool Updater::isCImgCompressed(const QByteArray & data)
@@ -71,18 +106,31 @@ Updater::~Updater() = default;
 void Updater::startUpdate(int ageLimit, int timeout, bool useNetwork)
 {
   TIMING;
+  if (!_pendingReplies.isEmpty()) {
+    // Starting over would lose track of the pending replies. The updateIsDone() signal
+    // will be emitted when the update in progress is over.
+    Logger::warning("An update is already in progress: new request ignored");
+    return;
+  }
   QStringList sources = GmicStdLib::substituteSourceVariables(Settings::filterSources());
   prependOfficialSourceIfRelevant(sources);
   SHOW(sources);
   _errorMessages.clear();
+  if (_networkAccessManager) { // Left over from a previous update
+    _networkAccessManager->deleteLater();
+  }
   _networkAccessManager = new QNetworkAccessManager(this);
   connect(_networkAccessManager, &QNetworkAccessManager::finished, this, &Updater::onNetworkReplyFinished);
   _someNetworkUpdatesAchieved = false;
   if (useNetwork) {
-    QDateTime limit = QDateTime::currentDateTime().addSecs(-3600 * (qint64)ageLimit);
+    const QDateTime limit = QDateTime::currentDateTime().addSecs(-3600ll * std::max(0, ageLimit));
     for (const QString & str : sources) {
       if (str.startsWith("http://") || str.startsWith("https://")) {
-        QString filename = localFilename(str);
+        const QString filename = localFilename(str);
+        if (filename.isEmpty()) {
+          _errorMessages << QString(tr("Error downloading %1 (cannot determine a local file name)")).arg(str);
+          continue;
+        }
         QFileInfo info(filename);
         if (!info.exists() || (info.lastModified() < limit)) {
           TRACE << "Downloading" << str << "to" << filename;
@@ -103,7 +151,15 @@ void Updater::startUpdate(int ageLimit, int timeout, bool useNetwork)
           //
           // Note that this information may solely be used for purely anonymous
           // statistical purposes.
-          _pendingReplies.insert(_networkAccessManager->get(request));
+          QNetworkReply * reply = _networkAccessManager->get(request);
+          // Do not let a (possibly user-supplied) source fill the memory: abort as soon as it is too large.
+          connect(reply, &QNetworkReply::downloadProgress, this, [reply](qint64 received, qint64 total) {
+            if (((received > MaxSourceFileSize) || (total > MaxSourceFileSize)) && !reply->property(TooLargeProperty).toBool()) {
+              reply->setProperty(TooLargeProperty, true);
+              reply->abort();
+            }
+          });
+          _pendingReplies.insert(reply);
         }
       }
     }
@@ -113,12 +169,12 @@ void Updater::startUpdate(int ageLimit, int timeout, bool useNetwork)
     _networkAccessManager->deleteLater();
     _networkAccessManager = nullptr;
   } else {
-    QTimer::singleShot(timeout * 1000, this, &Updater::cancelAllPendingDownloads);
+    _timeoutTimer->start(std::max(0, std::min(timeout, MaxDownloadTimeoutSeconds)) * 1000);
   }
   TIMING;
 }
 
-QList<QString> Updater::errorMessages()
+QList<QString> Updater::errorMessages() const
 {
   return _errorMessages;
 }
@@ -131,24 +187,32 @@ bool Updater::allDownloadsOk() const
 void Updater::processReply(QNetworkReply * reply)
 {
   const QString url = reply->request().url().toString();
+  const QString filename = localFilename(url);
+  if (filename.isEmpty()) {
+    _errorMessages << QString(tr("Error downloading %1 (cannot determine a local file name)")).arg(url);
+    return;
+  }
   QByteArray array = reply->readAll();
   if (array.isEmpty()) {
     // Empty body with no network error (e.g. an HTTP redirection that is not followed)
     _errorMessages << QString(tr("Error downloading %1 (empty file?)")).arg(url);
-    touchFile(localFilename(url)); // Prevent a systematic update on next startups (see onNetworkReplyFinished())
+    touchFile(filename); // Prevent a systematic update on next startups (see onNetworkReplyFinished())
+    return;
+  }
+  if (array.size() > MaxSourceFileSize) {
+    _errorMessages << tr("Error downloading %1<br/>File is too large").arg(url);
+    touchFile(filename);
     return;
   }
   if (isCImgCompressed(array)) {
     TRACE << QString("Decompressing reply from") << url;
-    QByteArray tmp = cimgzDecompress(array);
-    array = tmp;
+    array = cimgzDecompress(array);
   }
   if (array.isNull() || !array.contains("#@gui")) {
     _errorMessages << QString(tr("Could not read/decompress %1")).arg(url);
-    touchFile(localFilename(url)); // Prevent a systematic update on next startups (see onNetworkReplyFinished())
+    touchFile(filename); // Prevent a systematic update on next startups (see onNetworkReplyFinished())
     return;
   }
-  QString filename = localFilename(url);
   if (!safelyWrite(array, filename)) {
     _errorMessages << QString(tr("Error writing file %1")).arg(filename);
     return;
@@ -159,30 +223,44 @@ void Updater::processReply(QNetworkReply * reply)
 void Updater::onNetworkReplyFinished(QNetworkReply * reply)
 {
   TIMING;
-  QNetworkReply::NetworkError error = reply->error();
+  const QNetworkReply::NetworkError error = reply->error();
   if (error == QNetworkReply::NoError) {
     processReply(reply);
   } else {
-    QString str;
-    QDebug d(&str);
-    d << error;
-    str = str.trimmed();
-    _errorMessages << tr("Error downloading %1<br/>Error %2: %3").arg(reply->request().url().toString()).arg(static_cast<int>(error)).arg(str);
+    // Note: reply->url() may differ from the requested URL (redirection), and the local file name
+    // is always the one of the requested URL.
+    const QString url = reply->request().url().toString();
+    if (reply->property(TooLargeProperty).toBool()) {
+      _errorMessages << tr("Error downloading %1<br/>File is too large").arg(url);
+    } else if (reply->property(TimedOutProperty).toBool()) {
+      _errorMessages << QString(tr("Download timeout: %1")).arg(url);
+    } else {
+      QString str;
+      QDebug d(&str);
+      d << error;
+      str = str.trimmed();
+      _errorMessages << tr("Error downloading %1<br/>Error %2: %3").arg(url).arg(static_cast<int>(error)).arg(str);
+    }
     Logger::error("Update failed");
     Logger::note(QString("Error string: %1").arg(reply->errorString()));
-    Logger::note("******* Full reply contents ******\n");
-    Logger::note(reply->readAll());
+    // The body of an error reply is arbitrary (e.g. an HTML page): only log the beginning of it.
+    Logger::note(QString("******* Reply contents (at most %1 bytes) ******\n").arg(MaxLoggedReplyBytes));
+    Logger::note(QString::fromUtf8(reply->read(MaxLoggedReplyBytes)));
     Logger::note(QString("******** HTTP Status: %1").arg(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()));
     // We either create an empty local file or 'touch' the existing one to prevent a systematic update on next startups
     // Instead, usual delay will occur before next try
-    touchFile(localFilename(reply->url().toString()));
+    const QString filename = localFilename(url);
+    if (!filename.isEmpty()) {
+      touchFile(filename);
+    }
   }
   _pendingReplies.remove(reply);
   if (_pendingReplies.isEmpty()) {
+    _timeoutTimer->stop();
     if (_errorMessages.isEmpty()) {
-      emit updateIsDone((int)UpdateStatus::Successful);
+      emit updateIsDone(static_cast<int>(UpdateStatus::Successful));
     } else {
-      emit updateIsDone((int)UpdateStatus::SomeFailed);
+      emit updateIsDone(static_cast<int>(UpdateStatus::SomeFailed));
     }
     if (_networkAccessManager) {
       _networkAccessManager->deleteLater();
@@ -195,7 +273,7 @@ void Updater::onNetworkReplyFinished(QNetworkReply * reply)
 void Updater::notifyAllDownloadsOK()
 {
   _errorMessages.clear();
-  emit updateIsDone((int)UpdateStatus::Successful);
+  emit updateIsDone(static_cast<int>(UpdateStatus::Successful));
 }
 
 void Updater::cancelAllPendingDownloads()
@@ -203,16 +281,18 @@ void Updater::cancelAllPendingDownloads()
   TIMING;
   // Make a copy because aborting will call onNetworkReplyFinished, and
   // thus modify the _pendingReplies set.
-  QSet<QNetworkReply *> replies = _pendingReplies;
+  const QSet<QNetworkReply *> replies = _pendingReplies;
   for (QNetworkReply * reply : replies) {
-    _errorMessages << QString(tr("Download timeout: %1")).arg(reply->request().url().toString());
+    // The error message is added by onNetworkReplyFinished(), so that it is not reported twice.
+    reply->setProperty(TimedOutProperty, true);
     reply->abort();
   }
 }
 
 void Updater::onUpdateNotNecessary()
 {
-  emit updateIsDone((int)UpdateStatus::NotNecessary);
+  // Errors may have occurred before any download was started (e.g. no local file name for a source).
+  emit updateIsDone(static_cast<int>(_errorMessages.isEmpty() ? UpdateStatus::NotNecessary : UpdateStatus::SomeFailed));
 }
 
 QByteArray Updater::cimgzDecompress(const QByteArray & array)
@@ -221,7 +301,12 @@ QByteArray Updater::cimgzDecompress(const QByteArray & array)
     gmic_library::gmic_image<char> buffer(array.constData(), array.size(), 1, 1, 1, true);
     gmic_library::gmic_list<char> list = gmic_library::gmic_list<char>::get_unserialize(buffer);
     if (list.size() == 1) {
-      return {list[0].data(), int(list[0].size())};
+      const std::size_t size = list[0].size();
+      if (size > MaxDecompressedSize) { // Also guarantees that the conversion to int below is safe
+        Logger::warning("Updater::cimgzDecompress(): Decompressed data is too large");
+        return {};
+      }
+      return {list[0].data(), static_cast<int>(size)};
     }
   } catch (...) {
     Logger::warning("Updater::cimgzDecompress(): Error decompressing data");
@@ -238,31 +323,66 @@ QByteArray Updater::cimgzDecompressFile(const QString & filename)
     Logger::warning("Updater::cimgzDecompressFile(): gmic_image<>::load_cimg error for file " + filename);
     return QByteArray();
   }
-  return QByteArray((char *)buffer.data(), (int)buffer.size());
-}
-
-QString Updater::localFilename(QString url)
-{
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    QUrl u(url);
-    // Keep a plain file name only: a backslash is not a path separator in a URL, but it is one on Windows.
-    QString name = u.fileName();
-    const int separator = std::max(name.lastIndexOf(QChar('/')), name.lastIndexOf(QChar(92)));
-    if (separator != -1) {
-      name = name.mid(separator + 1);
-    }
-    if (name == "." || name == "..") {
-      name.clear();
-    }
-    return QString("%1%2").arg(gmicConfigPath(true)).arg(name);
+  const std::size_t size = buffer.size();
+  if (size > MaxDecompressedSize) {
+    // Beside limiting memory usage, this avoids a negative int size, which QByteArray would
+    // interpret as "up to the first null character".
+    Logger::warning("Updater::cimgzDecompressFile(): Decompressed data is too large for file " + filename);
+    return QByteArray();
   }
-  return url;
+  return QByteArray(reinterpret_cast<const char *>(buffer.data()), static_cast<int>(size));
 }
 
-bool Updater::appendLocalGmicFile(QByteArray & array, QString filename) const
+QString Updater::localFilename(const QString & url)
 {
-  QFileInfo info(filename);
-  if (!info.exists() || !info.size()) {
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    return url;
+  }
+  QString directory = gmicConfigPath(true);
+  if (directory.isEmpty()) {
+    // Without this test, the "local" file would be located in the current working directory.
+    Logger::error("Cannot find or create the G'MIC configuration folder");
+    return QString();
+  }
+  if (!directory.endsWith(QChar('/')) && !directory.endsWith(QChar(92))) {
+    directory.append(QChar('/'));
+  }
+  const QUrl u(url);
+  // Keep a plain file name only: a backslash is not a path separator in a URL, but it is one on Windows.
+  QString name = u.fileName();
+  const int separator = std::max(name.lastIndexOf(QChar('/')), name.lastIndexOf(QChar(92)));
+  if (separator != -1) {
+    name = name.mid(separator + 1);
+  }
+  // Control characters (e.g. a decoded "%00") and characters that are forbidden in file names on some systems
+  const QString forbiddenCharacters = QString::fromLatin1("<>:\"|?*");
+  for (int i = 0; i < name.size(); ++i) {
+    const QChar character = name.at(i);
+    if ((character.unicode() < 0x20) || (character.unicode() == 0x7f) || forbiddenCharacters.contains(character)) {
+      name[i] = QChar('_');
+    }
+  }
+  if (name.isEmpty() || (name == ".") || (name == "..") || (name.toUtf8().size() > 200)) {
+    // e.g. "https://example.com/": use a name derived from the URL, which is distinct for each source
+    // (the URL itself is the name of the cache entry, so it must not be a directory).
+    const QByteArray hash = QCryptographicHash::hash(url.toUtf8(), QCryptographicHash::Sha1).toHex().left(16);
+    name = QString("source_%1.gmic").arg(QString::fromLatin1(hash));
+  }
+  return directory + name;
+}
+
+bool Updater::appendLocalGmicFile(QByteArray & array, const QString & filename) const
+{
+  if (filename.isEmpty()) {
+    return false;
+  }
+  const QFileInfo info(filename);
+  // isFile() also rules out directories and special files (a FIFO would block forever when read).
+  if (!info.isFile() || !info.size()) {
+    return false;
+  }
+  if (info.size() > MaxSourceFileSize) {
+    Logger::warning(QString("File is too large, ignored: %1").arg(filename));
     return false;
   }
   QFile file(filename);
@@ -281,6 +401,14 @@ bool Updater::appendLocalGmicFile(QByteArray & array, QString filename) const
   } else {
     TRACE << "Appending:" << filename;
     fileData = file.readAll();
+    if (file.error() != QFileDevice::NoError) {
+      Logger::error(QString("Error reading file %1 (%2)").arg(filename, file.errorString()));
+      return false;
+    }
+  }
+  if (static_cast<qint64>(array.size()) + fileData.size() + 1 > MaxFullStdlibSize) {
+    Logger::warning(QString("The filters library would become too large, file ignored: %1").arg(filename));
+    return false;
   }
   array.append(fileData);
   array.append('\n');
@@ -344,8 +472,7 @@ void Updater::appendBuiltinGmicStdlib(QByteArray & array) const
     Logger::error("Could not decompress gmic builtin stdlib");
     return;
   }
-  QByteArray tmp(stdlib_h, int(stdlib_h.size() - 1));
-  array.append(tmp);
+  array.append(stdlib_h.data(), static_cast<int>(stdlib_h.size() - 1));
   array.append('\n');
 }
 

@@ -67,11 +67,14 @@ public:
    *
    * @param ageLimit Delay between 2 network updates in hours
    * @param timeout in seconds before aborting downloads
+   *
+   * Nothing is done if an update is already in progress: updateIsDone() will
+   * be emitted when that update ends.
    * @param useNetwork Enable internet access
    */
   void startUpdate(int ageLimit, int timeout, bool useNetwork);
 
-  QList<QString> errorMessages();
+  QList<QString> errorMessages() const;
   bool allDownloadsOk() const;
   QByteArray buildFullStdlib() const;
 
@@ -90,9 +93,14 @@ protected:
   void processReply(QNetworkReply * reply);
 
 private:
-  static QString localFilename(QString url);
+  /**
+   * @brief Local file name used to store a source (a plain file name is returned as is, and
+   *        for a URL it is a file of the G'MIC configuration folder).
+   *        An empty string is returned if no suitable local name can be determined.
+   */
+  static QString localFilename(const QString & url);
   void appendBuiltinGmicStdlib(QByteArray & array) const;
-  bool appendLocalGmicFile(QByteArray & array, QString filename) const;
+  bool appendLocalGmicFile(QByteArray & array, const QString & filename) const;
   void prependOfficialSourceIfRelevant(QStringList & list);
   explicit Updater(QObject * parent);
   static bool isCImgCompressed(const QByteArray & data);
@@ -103,6 +111,7 @@ private:
   static const char * OfficialFilterSourceURL;
 
   QNetworkAccessManager * _networkAccessManager;
+  QTimer * _timeoutTimer; // Aborts the pending downloads when the delay given to startUpdate() is over
   QSet<QNetworkReply *> _pendingReplies;
   QList<QString> _errorMessages;
   bool _someNetworkUpdatesAchieved;
