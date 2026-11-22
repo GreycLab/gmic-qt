@@ -788,7 +788,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gegl_buffer_set(buffer, &rect, 0, babl_format(format), img.data(), 0);
           g_object_unref(buffer);
           gimp_drawable_merge_shadow(_GIMP_DRAWABLE(inputLayers[p]), true);
-          gimp_drawable_update(_GIMP_DRAWABLE(inputLayers[p]), 0, 0, img.width(), img.height());
+          gimp_drawable_update(_GIMP_DRAWABLE(inputLayers[p]), rgn_x, rgn_y, rgn_width, rgn_height);
 #else
           GimpDrawable * drawable = gimp_drawable_get(inputLayers[p]);
           GimpPixelRgn region;
@@ -867,7 +867,9 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
           g_object_unref(buffer);
           gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
-          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0, img.width(), img.height());
+          gimp_drawable_update(_GIMP_DRAWABLE(layer_id), 0, 0,
+                               _gimp_drawable_get_width(_GIMP_DRAWABLE(layer_id)),
+                               _gimp_drawable_get_height(_GIMP_DRAWABLE(layer_id)));
 #else
           GimpDrawable * drawable = gimp_drawable_get(layer_id);
           GimpPixelRgn region;
@@ -876,7 +878,9 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gimp_pixel_rgn_set_rect(&region, (guchar *)img.data(), 0, 0, img.width(), img.height());
           gimp_drawable_flush(drawable);
           gimp_drawable_merge_shadow(layer_id, true);
-          gimp_drawable_update(layer_id, 0, 0, drawable->width, drawable->height);
+          gimp_drawable_update(layer_id, 0, 0,
+                               _gimp_drawable_get_width(_GIMP_DRAWABLE(layer_id)),
+                               _gimp_drawable_get_height(_GIMP_DRAWABLE(layer_id)));
           gimp_drawable_detach(drawable);
 #endif
           img.assign();
