@@ -623,7 +623,7 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
   // Retrieve image list
   images.assign(inputLayers.size());
   imageNames.assign(inputLayers.size());
-  inputLayerDimensions.assign(inputLayers.size(), 4);
+  inputLayerDimensions.assign(inputLayers.size(), 4, 1, 1, 0);
   gint rgn_x, rgn_y, rgn_width, rgn_height;
 
   gboolean isSelection = 0;
