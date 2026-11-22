@@ -160,10 +160,15 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent), ui(new Ui::MainW
 
   ui->zoomLevelSelector->setPreviewWidget(ui->previewWidget);
 
+  auto focusSearchField = [this]() {
+    ui->searchField->clear();
+    ui->searchField->setFocus();
+  };
+
   auto searchAction = new QAction(this);
   searchAction->setShortcut(QKeySequence::Find);
   searchAction->setShortcutContext(Qt::ApplicationShortcut);
-  connect(searchAction, &QAction::triggered, ui->searchField, QOverload<>::of(&SearchFieldWidget::setFocus));
+  connect(searchAction, &QAction::triggered, this, focusSearchField);
   addAction(searchAction);
 
   auto togglePreviewAction = new QAction(this);
@@ -175,7 +180,7 @@ MainWindow::MainWindow(QWidget * parent) : QMainWindow(parent), ui(new Ui::MainW
   searchAction = new QAction(this);
   searchAction->setShortcut(QKeySequence("/"));
   searchAction->setShortcutContext(Qt::ApplicationShortcut);
-  connect(searchAction, &QAction::triggered, ui->searchField, QOverload<>::of(&SearchFieldWidget::setFocus));
+  connect(searchAction, &QAction::triggered, this, focusSearchField);
   addAction(searchAction);
 
   {
