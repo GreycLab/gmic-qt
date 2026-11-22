@@ -23,17 +23,16 @@
  *
  */
 #include "FilterSelector/FavesModelReader.h"
-#include <QBuffer>
+#include <QByteArray>
 #include <QDebug>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonValue>
 #include <QList>
-#include <QLocale>
-#include <QRegularExpression>
-#include <QSettings>
 #include <QString>
+#include <QStringList>
 #include "FilterSelector/FavesModel.h"
 #include "Logger.h"
 #include "Utils.h"
@@ -41,6 +40,89 @@
 
 namespace GmicQt
 {
+
+namespace
+{
+
+// A faves file is a few kilobytes long (a few megabytes at most). A much larger file
+// is corrupted or is not a faves file, and is not worth being loaded in memory.
+const qint64 MaxFavesFileSize = 64ll << 20;
+
+bool readFileContents(QFile & file, QByteArray & contents)
+{
+  if (file.size() > MaxFavesFileSize) {
+    Logger::error(QString("File is too large to be a faves file: %1").arg(file.fileName()));
+    return false;
+  }
+  contents = file.readAll();
+  if (file.error() != QFileDevice::NoError) {
+    Logger::error(QString("Read error (%1): %2").arg(file.fileName(), file.errorString()));
+    return false;
+  }
+  return true;
+}
+
+QList<QString> splitLines(const QByteArray & contents)
+{
+  QList<QString> lines;
+  const QList<QByteArray> rawLines = contents.split('\n');
+  for (const QByteArray & rawLine : rawLines) {
+    lines.push_back(QString::fromUtf8(rawLine).trimmed());
+  }
+  return lines;
+}
+
+/*
+ * Split a line of the form "{name}{original name}{command}{preview command}{default values...}"
+ * (the first and last characters are the outer braces).
+ */
+bool parseBracedLine(const QString & line, QList<QString> & fields, bool oldNewlineCharacter)
+{
+  if (line.size() < 2) {
+    return false;
+  }
+  fields = line.mid(1, line.size() - 2).split("}{");
+  for (QString & str : fields) {
+    str.replace(QChar(gmic_lbrace), QString("{"));
+    str.replace(QChar(gmic_rbrace), QString("}"));
+    if (oldNewlineCharacter) {
+      // (29 == gmic_newline) until gmic version 2.7.1
+      str.replace(QChar(29), QString("\n"));
+    }
+  }
+  return true;
+}
+
+bool buildFave(QList<QString> fields, bool fromGmicGTK, FavesModel::Fave & fave)
+{
+  if (fields.size() < 4) {
+    return false;
+  }
+  QString command = fields[2];
+  QString previewCommand = fields[3];
+  if (fromGmicGTK) {
+    if (command.startsWith("gimp_")) {
+      command = QString("fx_") + command.mid(5);
+    }
+    if (previewCommand.startsWith("gimp_")) {
+      previewCommand = QString("fx_") + previewCommand.mid(5);
+    }
+  }
+  // A fave without name or command cannot be displayed nor run
+  if (fields[0].isEmpty() || command.isEmpty()) {
+    return false;
+  }
+  fave.setName(fields[0]);
+  fave.setOriginalName(fields[1]);
+  fave.setCommand(command);
+  fave.setPreviewCommand(previewCommand);
+  fields.erase(fields.begin(), fields.begin() + 4);
+  fave.setDefaultValues(fields);
+  fave.build();
+  return true;
+}
+
+} // namespace
 
 FavesModelReader::FavesModelReader(FavesModel & model) : _model(model) {}
 
@@ -58,14 +140,14 @@ FavesModel::Fave FavesModelReader::jsonObjectToFave(const QJsonObject & object)
   fave.setCommand(object.value("command").toString(""));
   fave.setPreviewCommand(object.value("preview").toString());
   QStringList defaultParameters;
-  QJsonArray array = object.value("defaultParameters").toArray();
-  for (const QJsonValueRef value : array) {
+  const QJsonArray parametersArray = object.value("defaultParameters").toArray();
+  for (const QJsonValue & value : parametersArray) {
     defaultParameters.push_back(value.toString());
   }
   fave.setDefaultValues(defaultParameters);
   QList<int> defaultVisibilities;
-  array = object.value("defaultVisibilities").toArray();
-  for (QJsonValueRef value : array) {
+  const QJsonArray visibilitiesArray = object.value("defaultVisibilities").toArray();
+  for (const QJsonValue & value : visibilitiesArray) {
     defaultVisibilities.push_back(value.toInt());
   }
   fave.setDefaultVisibilities(defaultVisibilities);
@@ -75,106 +157,103 @@ FavesModel::Fave FavesModelReader::jsonObjectToFave(const QJsonObject & object)
 
 void FavesModelReader::importFavesFromGmicGTK()
 {
-  QString filename = gmicGTKFavesFilename();
+  const QString filename = gmicGTKFavesFilename();
   QFile file(filename);
-  if (file.open(QIODevice::ReadOnly)) {
-    QString line;
-    int lineNumber = 1;
-    while (!(line = file.readLine()).isEmpty()) {
-      line = line.trimmed();
-      line.remove(QRegularExpression("^.")).remove(QRegularExpression(".$"));
-      QList<QString> list = line.split("}{");
-      for (QString & str : list) {
-        str.replace(QChar(gmic_lbrace), QString("{"));
-        str.replace(QChar(gmic_rbrace), QString("}"));
-      }
-      if (list.size() >= 4) {
-        FavesModel::Fave fave;
-        fave.setName(list.front());
-        fave.setOriginalName(list[1]);
-        fave.setCommand(list[2].replace(QRegularExpression("^gimp_"), "fx_"));
-        fave.setPreviewCommand(list[3].replace(QRegularExpression("^gimp_"), "fx_"));
-        list.pop_front();
-        list.pop_front();
-        list.pop_front();
-        list.pop_front();
-        fave.setDefaultValues(list);
-        fave.build();
-        _model.addFave(fave);
-      } else {
-        Logger::error(QString("Import failed for fave at %1:%2").arg(file.fileName()).arg(lineNumber));
-      }
-      ++lineNumber;
-    }
-  } else {
+  if (!file.open(QIODevice::ReadOnly)) {
     Logger::error("Import failed. Cannot open " + filename);
+    return;
+  }
+  QByteArray contents;
+  if (!readFileContents(file, contents)) {
+    return;
+  }
+  int lineNumber = 0;
+  const QList<QString> lines = splitLines(contents);
+  for (const QString & line : lines) {
+    ++lineNumber;
+    if (line.isEmpty()) {
+      continue;
+    }
+    QList<QString> fields;
+    FavesModel::Fave fave;
+    if (parseBracedLine(line, fields, false) && buildFave(fields, true, fave)) {
+      _model.addFave(fave);
+    } else {
+      Logger::error(QString("Import failed for fave at %1:%2").arg(file.fileName()).arg(lineNumber));
+    }
   }
 }
 
 void FavesModelReader::loadFaves()
 {
   // Read JSON faves if file exists
-  QString jsonFilename(QString("%1%2").arg(gmicConfigPath(false)).arg("gmic_qt_faves.json"));
+  const QString jsonFilename(QString("%1%2").arg(gmicConfigPath(false)).arg("gmic_qt_faves.json"));
   QFile jsonFile(jsonFilename);
   if (jsonFile.exists()) {
-    if (jsonFile.open(QIODevice::ReadOnly)) {
-      QJsonDocument document;
-      QJsonParseError parseError;
-      document = QJsonDocument::fromJson(jsonFile.readAll(), &parseError);
-      if (parseError.error == QJsonParseError::NoError) {
-        QJsonArray array = document.array();
-        for (const QJsonValueRef & value : array) {
-          _model.addFave(jsonObjectToFave(value.toObject()));
-        }
-      } else {
-        Logger::error("Cannot load faves (parse error) : " + jsonFilename);
-        Logger::error(parseError.errorString());
-      }
-    } else {
+    QByteArray contents;
+    if (!jsonFile.open(QIODevice::ReadOnly)) {
       Logger::log("Faves loading failed: Cannot open " + jsonFilename);
+      return;
+    }
+    if (!readFileContents(jsonFile, contents)) {
+      return;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(contents, &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+      Logger::error("Cannot load faves (parse error) : " + jsonFilename);
+      Logger::error(parseError.errorString());
+      return;
+    }
+    if (!document.isArray()) {
+      Logger::error("Cannot load faves (a JSON array was expected) : " + jsonFilename);
+      return;
+    }
+    const QJsonArray array = document.array();
+    int index = 0;
+    for (const QJsonValue & value : array) {
+      ++index;
+      if (!value.isObject()) {
+        Logger::warning(QString("Faves: ignoring entry #%1 which is not a JSON object (%2)").arg(index).arg(jsonFilename));
+        continue;
+      }
+      const FavesModel::Fave fave = jsonObjectToFave(value.toObject());
+      if (fave.name().isEmpty() || fave.command().isEmpty()) {
+        Logger::warning(QString("Faves: ignoring entry #%1 which has no name or no command (%2)").arg(index).arg(jsonFilename));
+        continue;
+      }
+      _model.addFave(fave);
     }
     return;
   }
 
   // Read old 2.0.0 prerelease file format if no JSON was found
-  QString filename(QString("%1%2").arg(gmicConfigPath(false)).arg("gmic_qt_faves"));
+  const QString filename(QString("%1%2").arg(gmicConfigPath(false)).arg("gmic_qt_faves"));
   QFile file(filename);
-  if (file.exists()) {
-    if (file.open(QIODevice::ReadOnly)) {
-      QString line;
-      int lineNumber = 1;
-      while (!(line = file.readLine()).isEmpty()) {
-        line = line.trimmed();
-        if (line.startsWith("{")) {
-          line.remove(QRegularExpression("^.")).remove(QRegularExpression(".$"));
-          QList<QString> list = line.split("}{");
-          for (QString & str : list) {
-            str.replace(QChar(gmic_lbrace), QString("{"));
-            str.replace(QChar(gmic_rbrace), QString("}"));
-            // (29 == gmic_newline) until gmic version 2.7.1
-            str.replace(QChar(29), QString("\n"));
-          }
-          if (list.size() >= 4) {
-            FavesModel::Fave fave;
-            fave.setName(list.front());
-            fave.setOriginalName(list[1]);
-            fave.setCommand(list[2]);
-            fave.setPreviewCommand(list[3]);
-            list.pop_front();
-            list.pop_front();
-            list.pop_front();
-            list.pop_front();
-            fave.setDefaultValues(list);
-            fave.build();
-            _model.addFave(fave);
-          } else {
-            Logger::log(QString("Loading failed for fave at %1:%2").arg(file.fileName()).arg(lineNumber));
-          }
-        }
-        ++lineNumber;
-      }
+  if (!file.exists()) {
+    return;
+  }
+  if (!file.open(QIODevice::ReadOnly)) {
+    Logger::error("Fave loading failed. Cannot open " + filename);
+    return;
+  }
+  QByteArray contents;
+  if (!readFileContents(file, contents)) {
+    return;
+  }
+  int lineNumber = 0;
+  const QList<QString> lines = splitLines(contents);
+  for (const QString & line : lines) {
+    ++lineNumber;
+    if (!line.startsWith("{")) {
+      continue;
+    }
+    QList<QString> fields;
+    FavesModel::Fave fave;
+    if (parseBracedLine(line, fields, true) && buildFave(fields, false, fave)) {
+      _model.addFave(fave);
     } else {
-      Logger::error("Fave loading failed. Cannot open " + filename);
+      Logger::log(QString("Loading failed for fave at %1:%2").arg(file.fileName()).arg(lineNumber));
     }
   }
 }

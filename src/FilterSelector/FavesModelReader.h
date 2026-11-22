@@ -34,7 +34,7 @@ namespace GmicQt
 
 class FavesModelReader {
 public:
-  FavesModelReader(FavesModel & model);
+  explicit FavesModelReader(FavesModel & model);
   void importFavesFromGmicGTK();
   void loadFaves();
   static QString gmicGTKFavesFilename();
