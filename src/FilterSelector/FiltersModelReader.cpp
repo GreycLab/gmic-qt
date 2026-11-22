@@ -243,8 +243,8 @@ bool containsInputMode(const QString & text, QString & inputMode)
   }
   traverseSpaces(pc, limit);
   if (pc != limit) {
-    char c = pc->toLatin1();
-    if (strchr("xX.*+vViI-", c)) {
+    const char c = pc->toLatin1(); // 0 for characters which are not in Latin-1
+    if ((c != '\0') && strchr("xX.*+vViI-", c)) { // strchr(str, 0) would match the terminating null character
       inputMode = *pc;
       return true;
     }
@@ -296,6 +296,9 @@ bool containsLeadingSpaceAndCrossSign(const char * text, const char * limit)
 void removeColonAndText(QString & text)
 {
   int i = text.indexOf(':');
+  if (i == -1) {
+    return;
+  }
   while ((i > 0) && isSpace(text[i - 1])) {
     --i;
   }
@@ -398,7 +401,7 @@ void removeInputMode(QString & text)
 {
   int index = text.indexOf(CHAR_COLON);
   if (index != -1) {
-    while ((index > 0) && (text[index - 1] == CHAR_SPACE)) {
+    while ((index > 0) && isSpace(text[index - 1])) {
       --index;
     }
     text.remove(index, text.size() - index);
@@ -500,10 +503,10 @@ void FiltersModelReader::parseFiltersDefinitions(const QByteArray & stdlibArray)
         }
 
         QList<QString> commands = filterCommands.split(",");
-        QString filterCommand = commands[0].trimmed();
         if (commands.isEmpty()) {
           commands.push_back("_none_");
         }
+        const QString filterCommand = commands[0].trimmed();
         if (commands.size() == 1) {
           commands.push_back(commands.front());
         }
@@ -528,11 +531,15 @@ void FiltersModelReader::parseFiltersDefinitions(const QByteArray & stdlibArray)
             preview[1].remove(closingParenthesisIndex, preview[1].size() - closingParenthesisIndex);
           }
           previewFactor = preview[1].toFloat(&ok);
-          if (!ok) {
-            Logger::error(QString("Cannot parse zoom factor for filter [%1]:\n%2").arg(filterName).arg(line));
-            previewFactor = PreviewFactorAny;
+          if (ok && !std::isfinite(previewFactor)) { // "nan" and "inf" are accepted by toFloat()
+            ok = false;
           }
-          previewFactor = std::abs(previewFactor);
+          if (ok) {
+            previewFactor = std::abs(previewFactor);
+          } else {
+            Logger::error(QString("Cannot parse zoom factor for filter [%1]:\n%2").arg(filterName).arg(line));
+            previewFactor = PreviewFactorAny; // Must not go through std::abs() (-1 would become PreviewFactorFullImage)
+          }
         }
 
         QString filterPreviewCommand = preview[0].trimmed();
@@ -597,7 +604,7 @@ bool FiltersModelReader::textIsPrecededBySpacesInSomeLineOfArray(const QByteArra
   const char * data = array.constData();
   while ((position = array.indexOf(text, from)) != -1) {
     int index = position - 1;
-    while ((index >= 0) && (data[index] != '\n') && (data[index] <= ' ')) {
+    while ((index >= 0) && (data[index] != '\n') && (static_cast<unsigned char>(data[index]) <= ' ')) {
       --index;
     }
     if ((index < 0) || (data[index] == '\n')) {
@@ -646,7 +653,7 @@ QString FiltersModelReader::readBufferLine(const char *& ptr, const char * limit
     return QString();
   }
   QString line;
-  const char * eol = strchr(ptr, '\n');
+  const char * eol = static_cast<const char *>(memchr(ptr, '\n', limit - ptr));
   const char * start = ptr;
   ptr = eol ? (eol + 1) : limit;
   const int lineSize = int(ptr - start);
@@ -659,11 +666,11 @@ QString FiltersModelReader::readBufferLine(const char *& ptr, const char * limit
         line.append(CHAR_NEWLINE);
         break;
       }
-      while (isSpace(*ptr)) { // Skip spaces
+      while ((ptr != limit) && isSpace(*ptr)) { // Skip spaces
         ++ptr;
       }
-      ++ptr; // Skip '#'
-      eol = strchr(ptr, '\n');
+      ++ptr; // Skip '#' (its presence has been checked above)
+      eol = static_cast<const char *>(memchr(ptr, '\n', limit - ptr));
       start = ptr;
       ptr = eol ? (eol + 1) : limit;
       line.append(QString::fromUtf8(start, int(ptr - start)));
@@ -673,3 +680,6 @@ QString FiltersModelReader::readBufferLine(const char *& ptr, const char * limit
 }
 
 } // namespace GmicQt
+
+
+
