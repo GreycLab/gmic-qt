@@ -62,6 +62,7 @@ GmicProcessor::GmicProcessor(QObject * parent) : QObject(parent)
   _lastAppliedCommandInOutState = InputOutputState::Unspecified;
   _ongoingFilterExecutionTime.start();
   _completeFullImageProcessingCount = 0;
+  _lastCompletedExecutionTime = 0;
 }
 
 void GmicProcessor::init()
@@ -348,7 +349,11 @@ void GmicProcessor::setGmicStatusQuotedParameters(const QVector<bool> & quotedPa
 
 void GmicProcessor::onGUIDynamismThreadFinished()
 {
-  Q_ASSERT_X(_filterThread, __PRETTY_FUNCTION__, "No filter thread");
+  if (!_filterThread) {
+    // A "finished" event posted before abortCurrentFilterThread() disconnected the thread
+    // may still be delivered afterwards (disconnecting does not remove queued events).
+    return;
+  }
   if (_filterThread->isRunning()) {
     return;
   }
@@ -376,7 +381,11 @@ void GmicProcessor::onGUIDynamismThreadFinished()
 
 void GmicProcessor::onPreviewThreadFinished()
 {
-  Q_ASSERT_X(_filterThread, __PRETTY_FUNCTION__, "No filter thread");
+  if (!_filterThread) {
+    // A "finished" event posted before abortCurrentFilterThread() disconnected the thread
+    // may still be delivered afterwards (disconnecting does not remove queued events).
+    return;
+  }
   if (_filterThread->isRunning()) {
     return;
   }
@@ -420,7 +429,11 @@ void GmicProcessor::onPreviewThreadFinished()
 
 void GmicProcessor::onApplyThreadFinished()
 {
-  Q_ASSERT_X(_filterThread, __PRETTY_FUNCTION__, "No filter thread");
+  if (!_filterThread) {
+    // A "finished" event posted before abortCurrentFilterThread() disconnected the thread
+    // may still be delivered afterwards (disconnecting does not remove queued events).
+    return;
+  }
   Q_ASSERT_X(!_filterThread->aborted(), __PRETTY_FUNCTION__, "Aborted thread!");
   if (_filterThread->isRunning()) {
     return;
@@ -511,8 +524,9 @@ void GmicProcessor::updateImageNames(gmic_list<char> & imageNames)
       int newXPos = (int)(xPos * (xFactor / (double)maxWidth));
       int newYPos = (int)(yPos * (yFactor / (double)maxHeight));
       str.replace(match.captured(0), QString("pos(%1%2%3)").arg(newXPos).arg(match.captured(2)).arg(newYPos));
-      name.resize(str.size() + 1);
-      std::memcpy(name.data(), str.toLatin1().constData(), name.width());
+      const QByteArray utf8 = str.toUtf8(); // Image names are UTF-8 encoded (see QString constructor above)
+      name.resize(utf8.size() + 1);
+      std::memcpy(name.data(), utf8.constData(), name.width()); // Includes the terminating null character
     }
   }
 }
