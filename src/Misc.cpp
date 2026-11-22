@@ -34,7 +34,8 @@
 #include <QStringList>
 #include <QTextStream>
 #include <algorithm>
-#include <cctype>
+#include <cstring>
+#include <vector>
 #include "Common.h"
 #include "Globals.h"
 #include "HtmlTranslator.h"
@@ -43,16 +44,31 @@
 
 namespace
 {
+
+// Locale-independent, ASCII-only character classification.
+// The <cctype> functions have an undefined behavior when given a negative value other
+// than EOF, which is what happens with plain (signed) chars holding UTF-8 bytes >= 0x80.
+inline bool isAsciiSpace(char c)
+{
+  return (c == ' ') || (c == '\t') || (c == '\n') || (c == '\v') || (c == '\f') || (c == '\r');
+}
+
+inline bool isAsciiAlnum(char c)
+{
+  return ((c >= '0') && (c <= '9')) || ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z'));
+}
+
 inline void skipSpaces(const char *& pc)
 {
-  while (isspace(*pc)) {
+  while (isAsciiSpace(*pc)) {
     ++pc;
   }
 }
+
 inline bool isEmptyOrSpaceSequence(const char * pc)
 {
   while (*pc) {
-    if (!isspace(*pc)) {
+    if (!isAsciiSpace(*pc)) {
       return false;
     }
     ++pc;
@@ -94,48 +110,54 @@ void appendWithSpace(QString & str, const QString & other)
 
 void downcaseCommandTitle(QString & title)
 {
+  if (title.isEmpty()) {
+    return;
+  }
+  // Regular expressions are compiled only once (they were rebuilt at each call).
+  static const QRegularExpression acronymRegExp("([A-Z0-9]{2,255})");
+  static const QRegularExpression dimensionRegExp("([1-9])[dD] ");
+  static const QRegularExpression specialWordsRegExp("(B&amp;W|[ \\[]Lab|[ \\[]YCbCr)");
+  static const QRegularExpression trailingCapitalRegExp(" ([A-Z])$");
+
   QMap<int, QString> acronyms;
   // Acronyms
-  QRegularExpression re("([A-Z0-9]{2,255})");
-  int index = 0;
-  QRegularExpressionMatch match = re.match(title, index);
+  QRegularExpressionMatch match = acronymRegExp.match(title);
   while (match.hasMatch()) {
-    QString pattern = match.captured(0);
+    const QString pattern = match.captured(0);
     acronyms[match.capturedStart(0)] = pattern;
-    index = match.capturedStart(0) + pattern.length();
-    match = re.match(title, index);
+    match = acronymRegExp.match(title, match.capturedStart(0) + pattern.length());
   }
 
   // 3D
-  re.setPattern("([1-9])[dD] ");
-  match = re.match(title);
+  match = dimensionRegExp.match(title);
   if (match.hasMatch()) {
     acronyms[match.capturedStart(0)] = match.captured(1) + "d ";
   }
 
   // B&amp;W [Lab [YCbCr
-  re.setPattern("(B&amp;W|[ \\[]Lab|[ \\[]YCbCr)");
-  index = 0;
-  match = re.match(title, index);
-  while ((index = match.capturedStart(0)) != -1) {
-    acronyms[index] = match.captured(1);
-    index += match.capturedLength(1);
-    match = re.match(title, index);
+  match = specialWordsRegExp.match(title);
+  while (match.hasMatch()) {
+    acronyms[match.capturedStart(1)] = match.captured(1);
+    match = specialWordsRegExp.match(title, match.capturedStart(1) + match.capturedLength(1));
   }
 
   // Uppercase letter in last position, after a space
-  re.setPattern(" ([A-Z])$");
-  match = re.match(title);
+  match = trailingCapitalRegExp.match(title);
   if (match.hasMatch()) {
     acronyms[match.capturedStart()] = match.captured(0);
   }
   title = title.toLower();
   QMap<int, QString>::const_iterator it = acronyms.cbegin();
   while (it != acronyms.cend()) {
-    title.replace(it.key(), it.value().length(), it.value());
+    // Lower-casing may (very rarely) change the length of a string: never write past its end.
+    if ((it.key() >= 0) && (it.key() + it.value().length() <= title.length())) {
+      title.replace(it.key(), it.value().length(), it.value());
+    }
     ++it;
   }
-  title[0] = title[0].toUpper();
+  if (!title.isEmpty()) {
+    title[0] = title[0].toUpper();
+  }
 }
 
 bool parseGmicFilterParameters(const QString & text, QStringList & args)
@@ -154,9 +176,11 @@ bool parseGmicFilterParameters(const char * text, QStringList & args)
   bool quoted = false;
   bool escaped = false;
   bool meaningfulSpaceFound = false;
-  char * buffer = new char[strlen(pc) + 1](); // +1 : room for the terminating '\0'
-  char * output = buffer;
-  while (*pc && !((meaningfulSpaceFound = (!quoted && !escaped && isspace(*pc))))) {
+  // RAII buffer (a raw new[] leaked if QString/QStringList allocation threw);
+  // +1 : room for the terminating '\0'
+  std::vector<char> buffer(std::strlen(pc) + 1, '\0');
+  char * output = buffer.data();
+  while (*pc && !((meaningfulSpaceFound = (!quoted && !escaped && isAsciiSpace(*pc))))) {
     if (escaped) {
       *output++ = *pc++;
       escaped = false;
@@ -168,19 +192,18 @@ bool parseGmicFilterParameters(const char * text, QStringList & args)
       ++pc;
     } else if (!quoted && !escaped && (*pc == ',')) {
       *output = '\0';
-      args.push_back(QString::fromUtf8(buffer));
-      output = buffer;
+      args.push_back(QString::fromUtf8(buffer.data()));
+      output = buffer.data();
       ++pc;
     } else {
       *output++ = *pc++;
     }
   }
-  const bool endsWidthComma = (output == buffer) && (pc > text) && (!quoted && !escaped && (pc[-1] == ','));
-  if ((output != buffer) || endsWidthComma) {
+  const bool endsWithComma = (output == buffer.data()) && (pc > text) && (!quoted && !escaped && (pc[-1] == ','));
+  if ((output != buffer.data()) || endsWithComma) {
     *output = '\0';
-    args.push_back(QString::fromUtf8(buffer));
+    args.push_back(QString::fromUtf8(buffer.data()));
   }
-  delete[] buffer;
   if (quoted || (meaningfulSpaceFound && !isEmptyOrSpaceSequence(pc))) {
     args.clear();
     return false;
@@ -201,10 +224,10 @@ bool parseGmicUniqueFilterCommand(const char * text, QString & command, QString 
     return false;
   }
   const char * pc = commandBegin;
-  while (isalnum(*pc) || (*pc == '_')) {
+  while (isAsciiAlnum(*pc) || (*pc == '_')) {
     ++pc;
   }
-  if ((*pc != '\0') && !isspace(*pc)) {
+  if ((*pc != '\0') && !isAsciiSpace(*pc)) {
     return false;
   }
   const char * const commandEnd = pc;
@@ -214,7 +237,7 @@ bool parseGmicUniqueFilterCommand(const char * text, QString & command, QString 
   bool escaped = false;
   bool meaningfulSpaceFound = false;
   const char * argumentStart = pc;
-  while (*pc && !((meaningfulSpaceFound = (!quoted && !escaped && isspace(*pc))))) {
+  while (*pc && !((meaningfulSpaceFound = (!quoted && !escaped && isAsciiSpace(*pc))))) {
     if (escaped) {
       escaped = false;
     } else if (*pc == '\\') {
@@ -234,29 +257,31 @@ bool parseGmicUniqueFilterCommand(const char * text, QString & command, QString 
 
 QString escapeUnescapedQuotes(const QString & text)
 {
-  std::string source_str = text.toStdString();
-  const char * pc = source_str.c_str();
-  std::vector<char> output_str(2 * source_str.size() + 1, static_cast<char>(0));
-  char * out = output_str.data();
+  // Works directly on the UTF-16 string: no round trip through std::string / UTF-8,
+  // and no truncation at an embedded null character.
+  QString result;
+  result.reserve(text.size() + 8);
   bool escaped = false;
-  while (*pc) {
+  for (const QChar c : text) {
     if (escaped) {
       escaped = false;
-    } else if (*pc == '\\') {
+    } else if (c == QChar('\\')) {
       escaped = true;
-    } else if (*pc == '"') {
-      *out++ = '\\';
+    } else if (c == QChar('"')) {
+      result += QChar('\\');
     }
-    *out++ = *pc++;
+    result += c;
   }
-  if (escaped) *out++ = '\\';
-  QString result = QString::fromUtf8(output_str.data());
+  if (escaped) {
+    result += QChar('\\');
+  }
   return result;
 }
 
 QString filterFullPathWithoutTags(const QList<QString> & path, const QString & name)
 {
   QStringList noTags = {QString()};
+  noTags.reserve(path.size() + 2);
   for (QString str : path) {
     if (str.startsWith(WarningPrefix)) {
       str.remove(0, 1);
@@ -269,9 +294,9 @@ QString filterFullPathWithoutTags(const QList<QString> & path, const QString & n
 
 QString filterFullPathBasename(const QString & path)
 {
-  QString result = path;
-  result.remove(QRegularExpression("^.*/"));
-  return result;
+  // Same result as removing "^.*/", without building a regular expression at each call.
+  const int index = path.lastIndexOf(QChar('/'));
+  return (index == -1) ? path : path.mid(index + 1);
 }
 
 QString flattenGmicParameterList(const QList<QString> & list, const QVector<bool> & quotedParameters)
@@ -280,11 +305,16 @@ QString flattenGmicParameterList(const QList<QString> & list, const QVector<bool
   if (list.isEmpty()) {
     return result;
   }
-  QList<QString>::const_iterator itList = list.constBegin();
-  QVector<bool>::const_iterator itQuoting = quotedParameters.constBegin();
-  result += (*itQuoting++) ? quotedString(*itList++) : (*itList++);
-  while (itList != list.end()) {
-    result += QString(",%1").arg((*itQuoting++) ? quotedString(*itList++) : (*itList++));
+  if (quotedParameters.size() < list.size()) {
+    // The original code read past the end of quotedParameters in this case.
+    Logger::warning(QString("flattenGmicParameterList(): %1 quoting flags for %2 parameters").arg(quotedParameters.size()).arg(list.size()));
+  }
+  for (int i = 0; i < list.size(); ++i) {
+    if (i) {
+      result += QChar(',');
+    }
+    const bool quote = (i < quotedParameters.size()) && quotedParameters[i];
+    result += quote ? quotedString(list[i]) : list[i];
   }
   return result;
 }
@@ -308,8 +338,9 @@ QString elided(const QString & text, int width)
 QVector<bool> quotedParameters(const QList<QString> & parameters)
 {
   QVector<bool> result;
+  result.reserve(parameters.size());
   for (const auto & str : parameters) {
-    result.push_back(str.startsWith("\""));
+    result.push_back(str.startsWith(QChar('"')));
   }
   return result;
 }
@@ -351,11 +382,7 @@ QStringList completePrefixFromFullList(const QStringList & prefix, const QString
     return prefix;
   }
   QStringList result = prefix;
-  QStringList::const_iterator it = fullList.constBegin();
-  it += prefix.size();
-  while (it != fullList.constEnd()) {
-    result.push_back(*it++);
-  }
+  result += fullList.mid(prefix.size());
   return result;
 }
 
@@ -367,6 +394,7 @@ QString quotedString(QString text)
 QStringList quotedStringList(const QStringList & stringList)
 {
   QStringList result;
+  result.reserve(stringList.size());
   for (const auto & text : stringList) {
     result.push_back(quotedString(text));
   }
@@ -376,13 +404,15 @@ QStringList quotedStringList(const QStringList & stringList)
 QString unescaped(const QString & text)
 {
   QByteArray ba = text.toUtf8();
-  if (ba.data() && *ba.data()) gmic_library::cimg::strunescape(ba.data());
-  return QString::fromUtf8(ba.data());
+  if (!ba.isEmpty()) {
+    gmic_library::cimg::strunescape(ba.data());
+  }
+  return QString::fromUtf8(ba.constData());
 }
 
 QString unquoted(const QString & text)
 {
-  QRegularExpression re("^\\s*\"(.*)\"\\s*$");
+  static const QRegularExpression re("^\\s*\"(.*)\"\\s*$");
   auto match = re.match(text);
   if (match.hasMatch()) {
     return match.captured(1);
@@ -393,8 +423,11 @@ QString unquoted(const QString & text)
 
 QStringList expandParameterList(const QStringList & parameters, const QVector<int> & sizes)
 {
-  // FIXME : Handle errors here
   QStringList result;
+  if (parameters.size() != sizes.size()) {
+    // Previously only checked by Q_ASSERT_X (i.e. silently ignored in release builds).
+    Logger::warning(QString("expandParameterList(): sizes are different (parameters: %1, sizes: %2)").arg(parameters.size()).arg(sizes.size()));
+  }
   Q_ASSERT_X(parameters.size() == sizes.size(), __PRETTY_FUNCTION__, QString("Sizes are different (parameters: %1, sizes: %2)").arg(parameters.size()).arg(sizes.size()).toStdString().c_str());
   QStringList::const_iterator itParam = parameters.constBegin();
   auto itSize = sizes.constBegin();
@@ -404,6 +437,7 @@ QStringList expandParameterList(const QStringList & parameters, const QVector<in
     } else if (*itSize == 1) {
       result.push_back(*itParam);
     } else {
+      Logger::warning(QString("expandParameterList(): parameter size should be at least 1 (it is %1)").arg(*itSize));
       Q_ASSERT_X((*itSize >= 1), __PRETTY_FUNCTION__, QString("Parameter size should be at least 1 (it is %1)").arg(*itSize).toStdString().c_str());
     }
     ++itParam;
@@ -423,7 +457,7 @@ QString readableDuration(qint64 ms)
   if (ms < MINUTE) {
     return QString("%1 s %2 ms").arg(ms / SECOND).arg(ms % SECOND);
   }
-  const int hours = ms / HOUR;
+  const int hours = static_cast<int>(ms / HOUR);
   return QString("%1:%2:%3.%4")                             //
       .arg(ms / HOUR, (hours < 10) ? 2 : 0, 10, QChar('0')) // Hours
       .arg((ms % HOUR) / MINUTE, 2, 10, QChar('0'))         // Minutes
@@ -433,12 +467,16 @@ QString readableDuration(qint64 ms)
 
 QString readableSize(quint64 n)
 {
-  if (n >= (1ul << 30)) {
-    return QString(QObject::tr("%1 GiB")).arg(n / (double)(1 << 30), 0, 'f', 1);
-  } else if (n >= (1ul << 20)) {
-    return QString(QObject::tr("%1 MiB")).arg(n / (double)(1 << 20), 0, 'f', 1);
-  } else if (n >= (1ul << 10)) {
-    return QString(QObject::tr("%1 KiB")).arg(n / (double)(1 << 10), 0, 'f', 1);
+  // Explicit 64-bit constants (1ul is only 32 bits wide on Windows).
+  constexpr quint64 KiB = Q_UINT64_C(1) << 10;
+  constexpr quint64 MiB = Q_UINT64_C(1) << 20;
+  constexpr quint64 GiB = Q_UINT64_C(1) << 30;
+  if (n >= GiB) {
+    return QString(QObject::tr("%1 GiB")).arg(n / static_cast<double>(GiB), 0, 'f', 1);
+  } else if (n >= MiB) {
+    return QString(QObject::tr("%1 MiB")).arg(n / static_cast<double>(MiB), 0, 'f', 1);
+  } else if (n >= KiB) {
+    return QString(QObject::tr("%1 KiB")).arg(n / static_cast<double>(KiB), 0, 'f', 1);
   } else {
     return QString(QObject::tr("%1 B")).arg(n);
   }
@@ -446,10 +484,9 @@ QString readableSize(quint64 n)
 
 qreal randomReal(qreal lowest, qreal highest)
 {
-  QRandomGenerator * rng = QRandomGenerator::global();
-  auto min = rng->min();
-  auto max = rng->max();
-  auto t = (rng->generate() - min) / double(max - min);
+  // generateDouble() has a 53-bit resolution and is uniformly distributed in [0,1)
+  // (the former implementation was limited to 32 bits of randomness).
+  const qreal t = QRandomGenerator::global()->generateDouble();
   return (1 - t) * lowest + t * highest;
 }
 
