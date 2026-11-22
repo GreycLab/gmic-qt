@@ -234,6 +234,45 @@ void updateWholeDrawable(_GimpLayerPtr layer)
   gimp_drawable_update(drawable, 0, 0, _gimp_drawable_get_width(drawable), _gimp_drawable_get_height(drawable));
 }
 
+// GEGL gives/expects interleaved float pixels in [0,1]; G'MIC uses planar pixels in [0,255].
+// The conversion is done in ONE pass (scale + re-layout), instead of "operator*=" followed by the
+// generic (strided, single-threaded) permute_axes() which also allocates and copies a second buffer.
+// src: interleaved (c fastest), dst: planar, both with pixelsPerPlane * spectrum floats.
+void interleavedToPlanar255(const float * src, float * dst, long long pixelsPerPlane, int spectrum)
+{
+  cimg_pragma_openmp(parallel for cimg_openmp_if(pixelsPerPlane >= 32768))
+  for (long long i = 0; i < pixelsPerPlane; ++i) {
+    const float * p = src + i * spectrum;
+    for (int c = 0; c < spectrum; ++c) {
+      dst[c * pixelsPerPlane + i] = p[c] * 255.0f;
+    }
+  }
+}
+
+// Inverse operation: planar [0,255] -> interleaved [0,1].
+void planar255ToInterleaved(const float * src, float * dst, long long pixelsPerPlane, int spectrum)
+{
+  cimg_pragma_openmp(parallel for cimg_openmp_if(pixelsPerPlane >= 32768))
+  for (long long i = 0; i < pixelsPerPlane; ++i) {
+    float * p = dst + i * spectrum;
+    for (int c = 0; c < spectrum; ++c) {
+      p[c] = src[c * pixelsPerPlane + i] / 255.0f;
+    }
+  }
+}
+
+// Writes a G'MIC image (planar, [0,255]) into a GEGL buffer. The image is released as soon as it
+// has been converted, to lower the memory peak.
+void writePlanar255ToBuffer(GeglBuffer * buffer, const GeglRectangle * rect, gmic_library::gmic_image<gmic_pixel_type> & img)
+{
+  const int spectrum = img.spectrum();
+  const char * const format = spectrum == 1 ? "Y' float" : spectrum == 2 ? "Y'A float" : spectrum == 3 ? "R'G'B' float" : "R'G'B'A float";
+  gmic_library::gmic_image<float> interleaved(spectrum, img.width(), img.height(), img.depth()); // Not initialized
+  planar255ToInterleaved(img.data(), interleaved.data(), (long long)img.width() * img.height() * img.depth(), spectrum);
+  img.assign();
+  gegl_buffer_set(buffer, rect, 0, babl_format(format), interleaved.data(), 0);
+}
+
 QMap<GimpLayerModeEffects, QString> reverseBlendingModeMap(const QMap<QString, GimpLayerModeEffects> & string2mode)
 {
   QMap<GimpLayerModeEffects, QString> result;
@@ -414,10 +453,16 @@ std::vector<_GimpLayerPtr> getFlatLayersList(_GimpImagePtr imageId)
 // Builds the list of input layers corresponding to an input mode.
 std::vector<_GimpLayerPtr> getInputLayers(_GimpImagePtr imageId, GmicQt::InputMode mode)
 {
-  const std::vector<_GimpLayerPtr> layers = getFlatLayersList(imageId);
-  const _GimpLayerPtr activeLayer = getActiveLayer(imageId);
-  const bool hasActiveLayer = _GIMP_LAYER_IS_NOT_NULL(activeLayer) && !gimp_item_is_group(_GIMP_ITEM(activeLayer));
   std::vector<_GimpLayerPtr> result;
+  if (mode == GmicQt::InputMode::NoInput) {
+    return result;
+  }
+  // Every libgimp query below is an IPC round trip: only do those that the mode really needs.
+  const bool needsActiveLayer = (mode == GmicQt::InputMode::Active || mode == GmicQt::InputMode::ActiveAndBelow || mode == GmicQt::InputMode::ActiveAndAbove);
+  const bool needsLayersList = (mode != GmicQt::InputMode::Active);
+  const std::vector<_GimpLayerPtr> layers = needsLayersList ? getFlatLayersList(imageId) : std::vector<_GimpLayerPtr>();
+  const _GimpLayerPtr activeLayer = needsActiveLayer ? getActiveLayer(imageId) : _GIMP_NULL_LAYER;
+  const bool hasActiveLayer = needsActiveLayer && _GIMP_LAYER_IS_NOT_NULL(activeLayer) && !gimp_item_is_group(_GIMP_ITEM(activeLayer));
   switch (mode) {
   case GmicQt::InputMode::NoInput:
     break;
@@ -592,10 +637,12 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
     gegl_rectangle_set(&rect, ix, iy, iw, ih);
     GeglBuffer * buffer = gimp_drawable_get_buffer(_GIMP_DRAWABLE(inputLayers[l]));
     const char * const format = spectrum == 1 ? "Y' " gmic_pixel_type_str : spectrum == 2 ? "Y'A " gmic_pixel_type_str : spectrum == 3 ? "R'G'B' " gmic_pixel_type_str : "R'G'B'A " gmic_pixel_type_str;
-    gmic_image<float> img(spectrum, iw, ih);
-    gegl_buffer_get(buffer, &rect, 1, babl_format(format), img.data(), 0, GEGL_ABYSS_NONE);
-    (img *= 255).permute_axes("yzcx");
+    gmic_image<float> interleaved(spectrum, iw, ih); // Not initialized
+    gegl_buffer_get(buffer, &rect, 1, babl_format(format), interleaved.data(), 0, GEGL_ABYSS_NONE);
     g_object_unref(buffer);
+    gmic_image<float> img(iw, ih, 1, spectrum);
+    interleavedToPlanar255(interleaved.data(), img.data(), (long long)iw * ih, spectrum);
+    interleaved.assign();
     img.move_to(images[l]);
   }
 }
@@ -680,7 +727,12 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
         layer_blendmode = gimp_layer_get_mode(inputLayers[p]);
         layer_opacity = gimp_layer_get_opacity(inputLayers[p]);
         _gimp_drawable_get_offsets(_GIMP_DRAWABLE(inputLayers[p]), &layer_posx, &layer_posy);
-        gmic_library::gmic_image<char>::string(getItemName(_GIMP_ITEM(inputLayers[p])).constData()).move_to(layer_name);
+        const QByteArray previousName = getItemName(_GIMP_ITEM(inputLayers[p]));
+        gmic_library::gmic_image<char>::string(previousName.constData()).move_to(layer_name);
+        const GimpLayerModeEffects previousMode = layer_blendmode;
+        const double previousOpacity = layer_opacity;
+        const gint previousPosX = layer_posx;
+        const gint previousPosY = layer_posy;
         get_output_layer_props(imageNames[p], layer_blendmode, layer_opacity, layer_posx, layer_posy, layer_name);
         gmic_library::gmic_image<gmic_pixel_type> & img = images[p];
         GmicQt::calibrateImage(img, inputLayerDimensions(p, 3), false);
@@ -688,20 +740,25 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           GeglRectangle rect;
           gegl_rectangle_set(&rect, rgn_x, rgn_y, rgn_width, rgn_height);
           GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(inputLayers[p]));
-          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
-          (img /= 255).permute_axes("cxyz");
-          gegl_buffer_set(buffer, &rect, 0, babl_format(format), img.data(), 0);
+          writePlanar255ToBuffer(buffer, &rect, img);
           g_object_unref(buffer);
           gimp_drawable_merge_shadow(_GIMP_DRAWABLE(inputLayers[p]), true);
           gimp_drawable_update(_GIMP_DRAWABLE(inputLayers[p]), rgn_x, rgn_y, rgn_width, rgn_height);
-          gimp_layer_set_mode(inputLayers[p], layer_blendmode);
-          gimp_layer_set_opacity(inputLayers[p], layer_opacity);
+          if (layer_blendmode != previousMode) {
+            gimp_layer_set_mode(inputLayers[p], layer_blendmode);
+          }
+          // The opacity went through a text round trip (name string), hence the tolerance.
+          if (std::fabs(layer_opacity - previousOpacity) > 1e-3) {
+            gimp_layer_set_opacity(inputLayers[p], layer_opacity);
+          }
           if (!is_selection) {
-            gimp_layer_set_offsets(inputLayers[p], layer_posx, layer_posy);
+            if (layer_posx != previousPosX || layer_posy != previousPosY) {
+              gimp_layer_set_offsets(inputLayers[p], layer_posx, layer_posy);
+            }
           } else {
             gimp_item_transform_translate(_GIMP_ITEM(inputLayers[p]), 0, 0);
           }
-          if (layer_name) {
+          if (layer_name && std::strcmp(layer_name.data(), previousName.constData()) != 0) {
             _GIMP_ITEM_SET_NAME(_GIMP_ITEM(inputLayers[p]), layer_name);
           }
         }
@@ -753,9 +810,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gimp_image_insert_layer(gmic_qt_gimp_image_id, layer_id, _GIMP_NULL_LAYER, static_cast<gint>(layer_pos + outIndex++));
 
           GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
-          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
-          (img /= 255).permute_axes("cxyz");
-          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
+          writePlanar255ToBuffer(buffer, nullptr, img);
           g_object_unref(buffer);
           gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
           updateWholeDrawable(layer_id);
@@ -822,9 +877,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gimp_image_insert_layer(gmic_qt_gimp_image_id, layer_id, _GIMP_NULL_LAYER, static_cast<gint>(outIndex++));
 
           GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
-          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
-          (img /= 255).permute_axes("cxyz");
-          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
+          writePlanar255ToBuffer(buffer, nullptr, img);
           g_object_unref(buffer);
           gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
           updateWholeDrawable(layer_id);
@@ -895,9 +948,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
           gimp_image_insert_layer(nimage_id, layer_id, _GIMP_NULL_LAYER, static_cast<gint>(outIndex++));
 
           GeglBuffer * buffer = gimp_drawable_get_shadow_buffer(_GIMP_DRAWABLE(layer_id));
-          const char * const format = img.spectrum() == 1 ? "Y' float" : img.spectrum() == 2 ? "Y'A float" : img.spectrum() == 3 ? "R'G'B' float" : "R'G'B'A float";
-          (img /= 255).permute_axes("cxyz");
-          gegl_buffer_set(buffer, NULL, 0, babl_format(format), img.data(), 0);
+          writePlanar255ToBuffer(buffer, nullptr, img);
           g_object_unref(buffer);
           gimp_drawable_merge_shadow(_GIMP_DRAWABLE(layer_id), true);
           updateWholeDrawable(layer_id);
