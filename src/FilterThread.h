@@ -26,8 +26,11 @@
 #define GMIC_QT__FILTERTHREAD_H
 
 #include <QElapsedTimer>
+#include <QList>
 #include <QString>
+#include <QStringList>
 #include <QThread>
+#include <memory>
 #include "Common.h"
 #include "GmicQt.h"
 #include "Host/GmicQtHost.h"
@@ -35,7 +38,8 @@
 namespace gmic_library
 {
 template <typename T> struct gmic_list;
-}
+template <typename T> struct gmic_image;
+} // namespace gmic_library
 
 namespace GmicQt
 {
@@ -58,12 +62,13 @@ public:
   QString errorMessage() const;
   bool failed() const;
   bool aborted() const;
+  /** Elapsed time (in milliseconds) since the creation of the thread object. */
   int duration() const;
   float progress() const;
   QString fullCommand() const;
   void setLogSuffix(const QString & text);
 
-  static QStringList status2StringList(QString);
+  static QStringList status2StringList(const QString &);
   static QList<int> status2Visibilities(const QString &);
 
 public slots:
@@ -76,18 +81,20 @@ protected:
   void run() override;
 
 private:
-  QString _command;
+  const QString _command;
   const QString _arguments;
-  QString _environment;
-  gmic_library::gmic_list<float> * _images;
-  gmic_library::gmic_list<char> * _imageNames;
-  gmic_library::gmic_image<char> * _persistentMemoryOutput;
-  bool _gmicAbort;
-  bool _failed;
+  const QString _environment;
+  std::unique_ptr<gmic_library::gmic_list<float>> _images;
+  std::unique_ptr<gmic_library::gmic_list<char>> _imageNames;
+  std::unique_ptr<gmic_library::gmic_image<char>> _persistentMemoryOutput;
+  // Note: the G'MIC library API requires plain "bool *" and "float *" for the abort flag and the
+  // progress value (see the gmic constructor), which are respectively written by the GUI thread and
+  // by the filter thread. They cannot be std::atomic objects.
+  bool _gmicAbort = false;
+  bool _failed = false;
   QString _gmicStatus;
-  float _gmicProgress;
+  float _gmicProgress = 0.0f;
   QString _errorMessage;
-  QString _name;
   QString _logSuffix;
   QElapsedTimer _startTime;
 };

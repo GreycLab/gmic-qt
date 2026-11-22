@@ -25,8 +25,10 @@
 #include "FilterThread.h"
 #include <QDebug>
 #include <QRegularExpression>
+#include <cstring>
 #include <exception>
 #include <iostream>
+#include <limits>
 #include "FilterParameters/AbstractParameter.h"
 #include "GmicStdlib.h"
 #include "Logger.h"
@@ -44,20 +46,16 @@ FilterThread::FilterThread(QObject * parent, const QString & command, const QStr
       _imageNames(new gmic_library::gmic_list<char>),                                       //
       _persistentMemoryOutput(new gmic_library::gmic_image<char>)
 {
-  _gmicAbort = false;
-  _failed = false;
-  _gmicProgress = 0.0f;
+  // Started here, and not in run(): duration() may be called by the GUI thread before the thread
+  // actually starts (elapsed() is undefined on an invalid timer), and restarting the timer from
+  // another thread while duration() is reading it would be a data race.
+  _startTime.start();
 #ifdef _IS_MACOS_
   setStackSize(8 * 1024 * 1024);
 #endif
 }
 
-FilterThread::~FilterThread()
-{
-  delete _images;
-  delete _imageNames;
-  delete _persistentMemoryOutput;
-}
+FilterThread::~FilterThread() = default; // Defined here, where the G'MIC types are complete
 
 void FilterThread::setImageNames(const gmic_library::gmic_list<char> & imageNames)
 {
@@ -93,62 +91,83 @@ gmic_library::gmic_image<char> & FilterThread::persistentMemoryOutput()
 // Output list is either :
 // - A list of 'strings' (terminated by null character), if output_visibility==false;
 // - Or a list of 'visibilities' (single char in { 0,'0','1','2' }, **not** terminated by null character).
-static gmic_list<char> status2Items(const char *status, const bool output_visibility) {
-  if (!status || *status!=gmic_lbrace) return gmic_list<char>();
-  const int len = (int)std::strlen(status);
+static gmic_list<char> status2Items(const char * status, const bool output_visibility)
+{
+  if (!status || (*status != gmic_lbrace)) {
+    return gmic_list<char>();
+  }
+  const size_t length = std::strlen(status);
+  if (length > static_cast<size_t>((std::numeric_limits<int>::max)() - 4)) {
+    return gmic_list<char>(); // Absurdly long status: do not risk any integer overflow below
+  }
+  const int len = static_cast<int>(length);
   gmic_list<char> out;
 
   bool is_inside = false;
   int pk = 0;
 
-  for (int k = 0; k<len; ++k) {
+  for (int k = 0; k < len; ++k) {
     const char c = status[k];
     switch (c) {
-    case gmic_lbrace :
+    case gmic_lbrace:
       if (!is_inside) {
-        if (k>=len - 1) return gmic_list<char>();
+        if (k >= len - 1) {
+          return gmic_list<char>();
+        }
         is_inside = true;
         pk = k + 1;
       }
       break;
-    case gmic_rbrace : {
-      if (!is_inside) return gmic_list<char>();
+    case gmic_rbrace: {
+      if (!is_inside) {
+        return gmic_list<char>();
+      }
       is_inside = false;
       char visibility = 0;
-      int ck = k;
-      if (k<len - 2 && status[k + 1]=='_' && status[k + 2]>='0' && status[k + 2]<='2') visibility = status[k+=2];
-      if (output_visibility) gmic_image<char>(1,1,1,1,visibility).move_to(out);
-      else {
-        gmic_image<char> it(ck - pk + 1); it.back() = 0;
-        std::memcpy(it,status + pk,it.width() - 1);
-        gmic::strreplace_fw(it);
-        it.move_to(out);
+      const int ck = k;
+      if ((k < len - 2) && (status[k + 1] == '_') && (status[k + 2] >= '0') && (status[k + 2] <= '2')) {
+        k += 2;
+        visibility = status[k];
+      }
+      if (output_visibility) {
+        gmic_image<char>(1, 1, 1, 1, visibility).move_to(out);
+      } else {
+        // ck >= pk here, so the item has (ck - pk) characters, plus a terminating null character
+        gmic_image<char> item(static_cast<unsigned int>(ck - pk + 1));
+        item.back() = 0;
+        std::memcpy(item.data(), status + pk, static_cast<size_t>(item.width() - 1));
+        gmic::strreplace_fw(item);
+        item.move_to(out);
       }
     } break;
-    default :
-      if (!is_inside) return gmic_list<char>();
+    default:
+      if (!is_inside) {
+        return gmic_list<char>();
+      }
     }
   }
   return out;
 }
 
-QStringList FilterThread::status2StringList(QString status)
+QStringList FilterThread::status2StringList(const QString & status)
 {
-  QByteArray ba = status.toLocal8Bit();
-  gmic_list<char> clist = status2Items(ba.constData(),false);
+  const QByteArray ba = status.toLocal8Bit();
+  const gmic_list<char> clist = status2Items(ba.constData(), false);
   QStringList qlist;
-  cimglist_for(clist,l) qlist<<QString::fromLocal8Bit(clist[l].data());
+  for (unsigned int l = 0; l < clist.size(); ++l) {
+    qlist << QString::fromLocal8Bit(clist[l].data());
+  }
   return qlist;
 }
 
 QList<int> FilterThread::status2Visibilities(const QString & status)
 {
-  QByteArray ba = status.toLocal8Bit();
-  gmic_list<char> clist = status2Items(ba.constData(),true);
+  const QByteArray ba = status.toLocal8Bit();
+  const gmic_list<char> clist = status2Items(ba.constData(), true);
   QList<int> qlist;
-  cimglist_for(clist,l) {
-    const char c = clist(l,0);
-    qlist.push_back(c?c - '0':(int)AbstractParameter::VisibilityState::Unspecified);
+  for (unsigned int l = 0; l < clist.size(); ++l) {
+    const char c = clist(l, 0);
+    qlist.push_back(c ? (c - '0') : static_cast<int>(AbstractParameter::VisibilityState::Unspecified));
   }
   return qlist;
 }
@@ -180,7 +199,8 @@ bool FilterThread::aborted() const
 
 int FilterThread::duration() const
 {
-  return static_cast<int>(_startTime.elapsed());
+  const qint64 elapsed = _startTime.elapsed();
+  return static_cast<int>(qBound<qint64>(0, elapsed, (std::numeric_limits<int>::max)()));
 }
 
 float FilterThread::progress() const
@@ -207,7 +227,6 @@ void FilterThread::abortGmic()
 
 void FilterThread::run()
 {
-  _startTime.start();
   _errorMessage.clear();
   _failed = false;
   QString fullCommandLine;
@@ -219,7 +238,10 @@ void FilterThread::run()
     // abortGmic() call made between start() and the actual execution of run() would be lost.
     _gmicProgress = -1;
     Logger::log(fullCommandLine, _logSuffix, true);
-    gmic gmicInstance(_environment.isEmpty() ? nullptr : QString("%1").arg(_environment).toLocal8Bit().constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
+    // These buffers must outlive the calls below which use their content
+    const QByteArray environment = _environment.toLocal8Bit();
+    const QByteArray commandLine = fullCommandLine.toLocal8Bit();
+    gmic gmicInstance(environment.isEmpty() ? nullptr : environment.constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
     if (PersistentMemory::image()) {
       if (*PersistentMemory::image() == gmic_store) {
         gmicInstance.set_variable("_persistent", PersistentMemory::image());
@@ -229,7 +251,7 @@ void FilterThread::run()
     }
     gmicInstance.set_variable("_host", '=', GmicQtHost::ApplicationShortname);
     gmicInstance.set_variable("_tk", '=', "qt");
-    gmicInstance.run(fullCommandLine.toLocal8Bit().constData(), *_images, *_imageNames);
+    gmicInstance.run(commandLine.constData(), *_images, *_imageNames);
     _gmicStatus = QString::fromLocal8Bit(gmicInstance.status);
     gmicInstance.get_variable("_persistent").move_to(*_persistentMemoryOutput);
   } catch (gmic_exception & e) {

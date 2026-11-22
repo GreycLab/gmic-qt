@@ -29,12 +29,12 @@
 #include <QList>
 #include <QObject>
 #include <QSettings>
-#include <QSignalMapper>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
 #include <QVector>
 #include <deque>
+#include <memory>
 #include "GmicQt.h"
 #include "InputOutputState.h"
 
@@ -52,6 +52,11 @@ class FilterSyncRunner;
 class GmicProcessor : public QObject {
   Q_OBJECT
 public:
+  /**
+   * Every member has a default value: a context which is only partially filled by the caller
+   * (e.g. a full image request does not set the preview related fields) must never lead to the
+   * reading of an indeterminate value.
+   */
   struct FilterContext {
     enum class RequestType
     {
@@ -61,23 +66,26 @@ public:
       GUIDynamismRun
     };
     struct VisibleRect {
-      double x, y, w, h;
+      double x = 0.0;
+      double y = 0.0;
+      double w = 1.0;
+      double h = 1.0;
     };
     struct PositionStringCorrection {
-      double xFactor;
-      double yFactor;
+      double xFactor = 1.0;
+      double yFactor = 1.0;
     };
-    RequestType requestType;
+    RequestType requestType = RequestType::Preview;
     VisibleRect visibleRect;
     InputOutputState inputOutputState;
     PositionStringCorrection positionStringCorrection;
-    double zoomFactor;
-    int previewWindowWidth;
-    int previewWindowHeight;
-    int previewTimeout;
+    double zoomFactor = 1.0;
+    int previewWindowWidth = 0;
+    int previewWindowHeight = 0;
+    int previewTimeout = 0;
     bool previewFromFullImage = false;
-    bool previewCheckBox;
-    bool randomized;
+    bool previewCheckBox = false;
+    bool randomized = false;
     QString filterName;
     QString filterCommand;
     QString filterFullPath;
@@ -85,8 +93,11 @@ public:
     QString filterHash;
   };
 
-  GmicProcessor(QObject * parent = nullptr);
+  explicit GmicProcessor(QObject * parent = nullptr);
   ~GmicProcessor() override;
+  GmicProcessor(const GmicProcessor &) = delete;
+  GmicProcessor & operator=(const GmicProcessor &) = delete;
+
   void init();
   void setContext(const FilterContext & context);
   void execute();
@@ -138,14 +149,16 @@ private:
   void updateImageNames(gmic_library::gmic_list<char> & imageNames);
   void abortCurrentFilterThread();
   void manageSynchonousRunner(FilterSyncRunner & runner);
+  /** Schedules the deletion of the current filter thread, and forgets it. */
+  void releaseFilterThread();
 
-  FilterThread * _filterThread;
+  FilterThread * _filterThread = nullptr;
   FilterContext _filterContext;
-  gmic_library::gmic_list<float> * _gmicImages;
-  gmic_library::gmic_image<float> * _previewImage;
+  std::unique_ptr<gmic_library::gmic_list<float>> _gmicImages;
+  std::unique_ptr<gmic_library::gmic_image<float>> _previewImage;
   QList<FilterThread *> _unfinishedAbortedThreads;
 
-  unsigned int _previewRandomSeed;
+  unsigned int _previewRandomSeed = 0;
   QStringList _gmicStatus;
   QList<int> _parametersVisibilityStates;
   QTimer _waitingCursorTimer;
@@ -159,9 +172,9 @@ private:
   InputOutputState _lastAppliedCommandInOutState;
   QElapsedTimer _ongoingFilterExecutionTime;
   QElapsedTimer _completedExecutionTime;
-  qint64 _lastCompletedExecutionTime;
+  qint64 _lastCompletedExecutionTime = 0;
   std::deque<int> _lastFilterPreviewExecutionDurations;
-  int _completeFullImageProcessingCount;
+  int _completeFullImageProcessingCount = 0;
   QVector<bool> _gmicStatusQuotedParameters;
 };
 

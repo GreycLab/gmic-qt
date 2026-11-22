@@ -25,19 +25,20 @@
 #ifndef GMIC_QT_FLOATPARAMETER_H
 #define GMIC_QT_FLOATPARAMETER_H
 
+#include <QLabel>
+#include <QPointer>
+#include <QSlider>
 #include <QString>
 #include "AbstractParameter.h"
-class QSlider;
-class QLabel;
+#include "CustomDoubleSpinBox.h"
 
 namespace GmicQt
 {
-class CustomDoubleSpinBox;
 
 class FloatParameter : public AbstractParameter {
   Q_OBJECT
 public:
-  FloatParameter(QObject * parent);
+  explicit FloatParameter(QObject * parent);
   ~FloatParameter() override;
   virtual int size() const override;
   bool addTo(QWidget *, int row) override;
@@ -59,18 +60,25 @@ public slots:
 private:
   void connectSliderSpinBox();
   void disconnectSliderSpinBox();
+  /** Slider position (in [0,SLIDER_MAX_RANGE]) which matches a value, whatever the range is. */
+  int sliderPositionFromValue(float value) const;
+  float valueFromSliderPosition(int position) const;
+  /** Updates the slider and the spin box (when they exist) without notifying anybody. */
+  void setWidgetsValue(float value);
+
   QString _name;
-  float _min;
-  float _max;
-  float _default;
-  float _value;
-  QLabel * _label;
-  QSlider * _slider;
-  CustomDoubleSpinBox * _spinBox;
-  int _timerId;
+  float _min = 0.0f;
+  float _max = 0.0f;
+  float _default = 0.0f;
+  float _value = 0.0f;
+  // Guarded pointers: the widgets are children of the parameters widget, which may delete them first.
+  QPointer<QLabel> _label;
+  QPointer<QSlider> _slider;
+  QPointer<CustomDoubleSpinBox> _spinBox;
+  int _timerId = 0;
   static const int UPDATE_DELAY = 300;
   static const int SLIDER_MAX_RANGE = 1000;
-  bool _connected;
+  bool _connected = false;
 };
 
 } // namespace GmicQt

@@ -27,6 +27,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QRegularExpression>
+#include <QWidget>
 #include <cstring>
 #include "Common.h"
 #include "FilterParameters/BoolParameter.h"
@@ -44,6 +45,57 @@
 #include "FilterParameters/SeparatorParameter.h"
 #include "FilterParameters/TextParameter.h"
 #include "Logger.h"
+
+namespace
+{
+bool isAsciiSpace(const char c)
+{
+  return (c == ' ') || (c == '\t') || (c == '\n') || (c == '\v') || (c == '\f') || (c == '\r');
+}
+
+/** Case insensitive test (ASCII only); "prefix" must be in lower case. */
+bool startsWithIgnoreCase(const char * text, const char * prefix)
+{
+  while (*prefix) {
+    char c = *text;
+    if (!c) {
+      return false;
+    }
+    if ((c >= 'A') && (c <= 'Z')) {
+      c = static_cast<char>(c - 'A' + 'a');
+    }
+    if (c != *prefix) {
+      return false;
+    }
+    ++text;
+    ++prefix;
+  }
+  return true;
+}
+
+/**
+ * For a parameter definition such as "name = [_~]{0,2}type(...)", returns a pointer to the
+ * beginning of "type", or nullptr if there is no '=' sign.
+ *
+ * Replaces the regular expressions "^[^=]*\\s*=\\s*[_~]{0,2}type" which were compiled again, for
+ * each of the 14 types, for each parameter, and applied to a copy of the whole remaining text.
+ */
+const char * parameterTypeStart(const char * text)
+{
+  const char * p = std::strchr(text, '=');
+  if (!p) {
+    return nullptr;
+  }
+  ++p;
+  while (isAsciiSpace(*p)) {
+    ++p;
+  }
+  for (int count = 0; (count < 2) && ((*p == '_') || (*p == '~')); ++count) {
+    ++p;
+  }
+  return p;
+}
+} // namespace
 
 namespace GmicQt
 {
@@ -88,45 +140,51 @@ void AbstractParameter::extractPositionFromKeypointList(KeypointList &) {}
 
 AbstractParameter * AbstractParameter::createFromText(const QString & filterName, const char * text, int & length, QString & error, QObject * parent)
 {
-  AbstractParameter * result = nullptr;
-  QString line = text;
   error.clear();
+  if (!text) {
+    return nullptr;
+  }
+  AbstractParameter * result = nullptr;
 
-#define IS_OF_TYPE(ptype) QRegularExpression("^[^=]*\\s*=\\s*[_~]{0,2}" ptype, QRegularExpression::CaseInsensitiveOption).match(line).hasMatch()
-
-  if (IS_OF_TYPE("int")) {
-    result = new IntParameter(parent);
-  } else if (IS_OF_TYPE("float")) {
-    result = new FloatParameter(parent);
-  } else if (IS_OF_TYPE("bool")) {
-    result = new BoolParameter(parent);
-  } else if (IS_OF_TYPE("choice")) {
-    result = new ChoiceParameter(parent);
-  } else if (IS_OF_TYPE("color")) {
-    result = new ColorParameter(parent);
-  } else if (IS_OF_TYPE("separator")) {
-    result = new SeparatorParameter(parent);
-  } else if (IS_OF_TYPE("note")) {
-    result = new NoteParameter(parent);
-  } else if (IS_OF_TYPE("file") || IS_OF_TYPE("filein") || IS_OF_TYPE("fileout")) {
-    result = new FileParameter(parent);
-  } else if (IS_OF_TYPE("folder")) {
-    result = new FolderParameter(parent);
-  } else if (IS_OF_TYPE("text")) {
-    result = new TextParameter(parent);
-  } else if (IS_OF_TYPE("link")) {
-    result = new LinkParameter(parent);
-  } else if (IS_OF_TYPE("value")) {
-    result = new ConstParameter(parent);
-  } else if (IS_OF_TYPE("button")) {
-    result = new ButtonParameter(parent);
-  } else if (IS_OF_TYPE("point")) {
-    result = new PointParameter(parent);
+  // The order matters (the first matching prefix wins), as with the former regular expressions.
+  const char * const type = parameterTypeStart(text);
+  if (type) {
+    if (startsWithIgnoreCase(type, "int")) {
+      result = new IntParameter(parent);
+    } else if (startsWithIgnoreCase(type, "float")) {
+      result = new FloatParameter(parent);
+    } else if (startsWithIgnoreCase(type, "bool")) {
+      result = new BoolParameter(parent);
+    } else if (startsWithIgnoreCase(type, "choice")) {
+      result = new ChoiceParameter(parent);
+    } else if (startsWithIgnoreCase(type, "color")) {
+      result = new ColorParameter(parent);
+    } else if (startsWithIgnoreCase(type, "separator")) {
+      result = new SeparatorParameter(parent);
+    } else if (startsWithIgnoreCase(type, "note")) {
+      result = new NoteParameter(parent);
+    } else if (startsWithIgnoreCase(type, "file")) { // Also matches "filein" and "fileout"
+      result = new FileParameter(parent);
+    } else if (startsWithIgnoreCase(type, "folder")) {
+      result = new FolderParameter(parent);
+    } else if (startsWithIgnoreCase(type, "text")) {
+      result = new TextParameter(parent);
+    } else if (startsWithIgnoreCase(type, "link")) {
+      result = new LinkParameter(parent);
+    } else if (startsWithIgnoreCase(type, "value")) {
+      result = new ConstParameter(parent);
+    } else if (startsWithIgnoreCase(type, "button")) {
+      result = new ButtonParameter(parent);
+    } else if (startsWithIgnoreCase(type, "point")) {
+      result = new PointParameter(parent);
+    }
   }
   if (result) {
     if (!result->initFromText(filterName, text, length)) {
       delete result;
       result = nullptr;
+      // Error messages only: the (potentially long) text is converted to a QString only when needed.
+      const QString line = QString::fromUtf8(text);
       if (!line.isEmpty()) {
         QRegularExpression nameRegExp("^([^=]*\\s*)=");
         QRegularExpressionMatch match = nameRegExp.match(line);
@@ -137,6 +195,7 @@ AbstractParameter * AbstractParameter::createFromText(const QString & filterName
       }
     }
   } else {
+    const QString line = QString::fromUtf8(text);
     if (!line.isEmpty()) {
       QRegularExpression nameRegExp("^([^=]*\\s*)=");
       QRegularExpressionMatch match = nameRegExp.match(line);
@@ -167,8 +226,8 @@ void AbstractParameter::hideWidgets()
   }
   for (int col = 0; col < 5; ++col) {
     QLayoutItem * item = _grid->itemAtPosition(_row, col);
-    if (item) {
-      auto widget = item->widget();
+    QWidget * widget = item ? item->widget() : nullptr; // An item may be a spacer or a layout
+    if (widget) {
       widget->hide();
     }
   }
@@ -186,8 +245,8 @@ void AbstractParameter::setVisibilityState(AbstractParameter::VisibilityState st
   }
   for (int col = 0; col < 5; ++col) {
     QLayoutItem * item = _grid->itemAtPosition(_row, col);
-    if (item) {
-      auto widget = item->widget();
+    QWidget * widget = item ? item->widget() : nullptr; // An item may be a spacer or a layout
+    if (widget) {
       switch (state) {
       case VisibilityState::Visible:
         widget->setEnabled(true);
@@ -311,3 +370,5 @@ void AbstractParameter::notifyIfRelevant()
 }
 
 } // namespace GmicQt
+
+

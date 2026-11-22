@@ -32,6 +32,8 @@
 #include <QString>
 #include <QTimerEvent>
 #include <QWidget>
+#include <algorithm>
+#include <cmath>
 #include "FilterParameters/CustomDoubleSpinBox.h"
 #include "FilterTextTranslator.h"
 #include "Globals.h"
@@ -43,17 +45,14 @@
 namespace GmicQt
 {
 
-FloatParameter::FloatParameter(QObject * parent) : AbstractParameter(parent), _min(0), _max(0), _default(0), _value(0), _label(nullptr), _slider(nullptr), _spinBox(nullptr)
-{
-  _timerId = 0;
-  _connected = false;
-}
+FloatParameter::FloatParameter(QObject * parent) : AbstractParameter(parent) {}
 
 FloatParameter::~FloatParameter()
 {
-  delete _spinBox;
-  delete _slider;
-  delete _label;
+  // Deleting a null (or already destroyed, thanks to QPointer) widget is harmless.
+  delete _spinBox.data();
+  delete _slider.data();
+  delete _label.data();
 }
 
 int FloatParameter::size() const
@@ -61,92 +60,124 @@ int FloatParameter::size() const
   return 1;
 }
 
+int FloatParameter::sliderPositionFromValue(const float value) const
+{
+  const float range = _max - _min;
+  if (!(range > 0.0f) || !std::isfinite(range)) {
+    return 0; // Empty (or invalid) range: avoids a division by zero, and NaN to int conversions
+  }
+  const float position = SLIDER_MAX_RANGE * (value - _min) / range;
+  if (!(position > 0.0f)) { // Also catches NaN
+    return 0;
+  }
+  if (position >= static_cast<float>(SLIDER_MAX_RANGE)) {
+    return SLIDER_MAX_RANGE;
+  }
+  return static_cast<int>(position);
+}
+
+float FloatParameter::valueFromSliderPosition(const int position) const
+{
+  return _min + (static_cast<float>(position) / static_cast<float>(SLIDER_MAX_RANGE)) * (_max - _min);
+}
+
+void FloatParameter::setWidgetsValue(const float value)
+{
+  if (!_slider || !_spinBox) {
+    return;
+  }
+  disconnectSliderSpinBox();
+  _slider->setValue(sliderPositionFromValue(value));
+  _spinBox->setValue(static_cast<double>(value));
+  connectSliderSpinBox();
+}
+
 bool FloatParameter::addTo(QWidget * widget, int row)
 {
-  _grid = dynamic_cast<QGridLayout *>(widget->layout());
-  Q_ASSERT_X(_grid, __PRETTY_FUNCTION__, "No grid layout in widget");
+  _grid = widget ? dynamic_cast<QGridLayout *>(widget->layout()) : nullptr;
+  Q_ASSERT_X(_grid, Q_FUNC_INFO, "No grid layout in widget");
+  if (!_grid) {
+    Logger::error(QString("FloatParameter::addTo(): no grid layout in widget (parameter \"%1\")").arg(_name));
+    return false;
+  }
   _row = row;
-  delete _spinBox;
-  delete _slider;
-  delete _label;
-  _slider = new QSlider(Qt::Horizontal, widget);
-  _slider->setMinimumWidth(SLIDER_MIN_WIDTH);
-  _slider->setRange(0, SLIDER_MAX_RANGE);
-  _slider->setValue(static_cast<int>(SLIDER_MAX_RANGE * (_value - _min) / (_max - _min)));
+  if (_timerId) {
+    killTimer(_timerId);
+    _timerId = 0;
+  }
+  delete _spinBox.data();
+  delete _slider.data();
+  delete _label.data();
+  _connected = false; // The connections died with the previous widgets, if any
+
+  QSlider * slider = new QSlider(Qt::Horizontal, widget);
+  _slider = slider;
+  slider->setMinimumWidth(SLIDER_MIN_WIDTH);
+  slider->setRange(0, SLIDER_MAX_RANGE);
+  slider->setValue(sliderPositionFromValue(_value));
   if (Settings::darkThemeEnabled()) {
-    QPalette p = _slider->palette();
+    QPalette p = slider->palette();
     p.setColor(QPalette::Button, QColor(100, 100, 100));
     p.setColor(QPalette::Highlight, QColor(130, 130, 130));
-    _slider->setPalette(p);
+    slider->setPalette(p);
   }
 
-  _spinBox = new CustomDoubleSpinBox(widget, _min, _max);
-  _spinBox->setSingleStep(double(_max - _min) / 100.0);
-  _spinBox->setValue((double)_value);
-  _grid->addWidget(_label = new QLabel(_name, widget), row, 0, 1, 1);
-  setTextSelectable(_label);
-  _grid->addWidget(_slider, row, 1, 1, 1);
-  _grid->addWidget(_spinBox, row, 2, 1, 1);
+  CustomDoubleSpinBox * spinBox = new CustomDoubleSpinBox(widget, _min, _max);
+  _spinBox = spinBox;
+  spinBox->setSingleStep(static_cast<double>(_max - _min) / 100.0);
+  spinBox->setValue(static_cast<double>(_value));
+
+  QLabel * label = new QLabel(_name, widget);
+  _label = label;
+  _grid->addWidget(label, row, 0, 1, 1);
+  setTextSelectable(label);
+  _grid->addWidget(slider, row, 1, 1, 1);
+  _grid->addWidget(spinBox, row, 2, 1, 1);
 
   connectSliderSpinBox();
 
-  connect(_spinBox, &CustomDoubleSpinBox::editingFinished, [this]() { notifyIfRelevant(); });
+  // The spin box is the context object (and not "this"): disconnectSliderSpinBox() removes every
+  // connection from the spin box to "this", but this one must remain.
+  connect(spinBox, &CustomDoubleSpinBox::editingFinished, spinBox, [this]() { notifyIfRelevant(); });
 
   return true;
 }
 
 QString FloatParameter::value() const
 {
-  QLocale currentLocale;
-  QLocale::setDefault(QLocale::c());
-  QString value = QString("%1").arg(_spinBox->value());
-  QLocale::setDefault(currentLocale);
-  return value;
+  // "%1" (without the 'L' modifier) always uses the C locale: there is no need to temporarily
+  // change the (global, and not thread-safe to modify) default locale.
+  return QString("%1").arg(_spinBox ? _spinBox->value() : static_cast<double>(_value));
 }
 
 QString FloatParameter::defaultValue() const
 {
-  QLocale currentLocale;
-  QLocale::setDefault(QLocale::c());
-  QString value = QString("%1").arg(static_cast<double>(_default));
-  QLocale::setDefault(currentLocale);
-  return value;
+  return QString("%1").arg(static_cast<double>(_default));
 }
 
 void FloatParameter::setValue(const QString & value)
 {
   bool ok = true;
   const float x = value.toFloat(&ok);
-  if (!ok) {
+  if (!ok || !std::isfinite(x)) {
     Logger::warning(QString("FloatParameter::setValue(\"%1\"): bad value").arg(value));
     return;
   }
   _value = x;
-  if (_slider) {
-    disconnectSliderSpinBox();
-    _slider->setValue(static_cast<int>(SLIDER_MAX_RANGE * (_value - _min) / (_max - _min)));
-    _spinBox->setValue((double)_value);
-    connectSliderSpinBox();
-  }
+  setWidgetsValue(_value);
 }
 
 void FloatParameter::reset()
 {
-  disconnectSliderSpinBox();
   _value = _default;
-  _slider->setValue(static_cast<int>(SLIDER_MAX_RANGE * (_value - _min) / (_max - _min)));
-  _spinBox->setValue((double)_default);
-  connectSliderSpinBox();
+  setWidgetsValue(_value);
 }
 
 void FloatParameter::randomize()
 {
   if (acceptRandom()) {
-    disconnectSliderSpinBox();
-    _value = randomReal(_min, _max);
-    _slider->setValue(static_cast<int>(SLIDER_MAX_RANGE * (_value - _min) / (_max - _min)));
-    _spinBox->setValue(_value);
-    connectSliderSpinBox();
+    _value = static_cast<float>(randomReal(_min, _max));
+    setWidgetsValue(_value);
   }
 }
 
@@ -162,44 +193,61 @@ bool FloatParameter::initFromText(const QString & filterName, const char * text,
   if (values.size() != 3) {
     return false;
   }
-  bool ok1, ok2, ok3;
+  bool ok1 = false;
+  bool ok2 = false;
+  bool ok3 = false;
   _default = values[0].toFloat(&ok1);
   _min = values[1].toFloat(&ok2);
   _max = values[2].toFloat(&ok3);
+  if (!(ok1 && ok2 && ok3)) {
+    return false;
+  }
+  // toFloat() accepts "nan" and "inf": such values would break the widgets.
+  if (!std::isfinite(_default) || !std::isfinite(_min) || !std::isfinite(_max)) {
+    Logger::warning(QString("Parameter \"%1\": float values must be finite numbers.").arg(_name));
+    return false;
+  }
+  if (_min > _max) {
+    Logger::warning(QString("Parameter \"%1\": minimum value is greater than maximum value (swapped).").arg(_name));
+    std::swap(_min, _max);
+  }
   _value = _default;
-  return ok1 && ok2 && ok3;
+  return true;
 }
 
 void FloatParameter::timerEvent(QTimerEvent * event)
 {
   killTimer(event->timerId());
   _timerId = 0;
-  if (!_spinBox->unfinishedKeyboardEditing()) {
+  if (_spinBox && !_spinBox->unfinishedKeyboardEditing()) {
     notifyIfRelevant();
   }
 }
 
-void FloatParameter::onSliderMoved(int value)
+void FloatParameter::onSliderMoved(int position)
 {
-  const float fValue = _min + (float(value) / static_cast<float>(SLIDER_MAX_RANGE)) * (_max - _min);
-  if (fValue != _value) {
+  const float fValue = valueFromSliderPosition(position);
+  if (_spinBox && (fValue != _value)) {
     _spinBox->setValue(_value = fValue);
   }
 }
 
-void FloatParameter::onSliderValueChanged(int value)
+void FloatParameter::onSliderValueChanged(int position)
 {
-  const float fValue = _min + (float(value) / static_cast<float>(SLIDER_MAX_RANGE)) * (_max - _min);
-  if (fValue != _value) {
+  const float fValue = valueFromSliderPosition(position);
+  if (_spinBox && (fValue != _value)) {
     _spinBox->setValue(_value = fValue);
   }
 }
 
 void FloatParameter::onSpinBoxChanged(double x)
 {
-  _value = float(x);
+  _value = static_cast<float>(x);
+  if (!_slider || !_spinBox) {
+    return;
+  }
   disconnectSliderSpinBox();
-  _slider->setValue(static_cast<int>(SLIDER_MAX_RANGE * (_value - _min) / (_max - _min)));
+  _slider->setValue(sliderPositionFromValue(_value));
   connectSliderSpinBox();
   if (_timerId) {
     killTimer(_timerId);
@@ -213,12 +261,12 @@ void FloatParameter::onSpinBoxChanged(double x)
 
 void FloatParameter::connectSliderSpinBox()
 {
-  if (_connected) {
+  if (_connected || !_slider || !_spinBox) {
     return;
   }
-  connect(_slider, &QSlider::sliderMoved, this, &FloatParameter::onSliderMoved);
-  connect(_slider, &QSlider::valueChanged, this, &FloatParameter::onSliderValueChanged);
-  connect(_spinBox, QOverload<double>::of(&CustomDoubleSpinBox::valueChanged), this, &FloatParameter::onSpinBoxChanged);
+  connect(_slider.data(), &QSlider::sliderMoved, this, &FloatParameter::onSliderMoved);
+  connect(_slider.data(), &QSlider::valueChanged, this, &FloatParameter::onSliderValueChanged);
+  connect(_spinBox.data(), QOverload<double>::of(&CustomDoubleSpinBox::valueChanged), this, &FloatParameter::onSpinBoxChanged);
   _connected = true;
 }
 
@@ -227,8 +275,12 @@ void FloatParameter::disconnectSliderSpinBox()
   if (!_connected) {
     return;
   }
-  _slider->disconnect(this);
-  _spinBox->disconnect(this);
+  if (_slider) {
+    _slider->disconnect(this);
+  }
+  if (_spinBox) {
+    _spinBox->disconnect(this);
+  }
   _connected = false;
 }
 
