@@ -780,14 +780,15 @@ void MainWindow::onPreviewKeypointsEvent(unsigned int flags, unsigned long time)
     _lastPreviewKeypointBurstUpdateTime = 0;
   } else {
     ui->filterParams->setKeypoints(ui->previewWidget->keypoints(), false);
-    if ((flags & PreviewWidget::KeypointBurstEvent)) {
+    if (flags & PreviewWidget::KeypointBurstEvent) {
       // Durations are ints: make sure a negative value is never converted to a huge unsigned one
       const auto lastDuration = static_cast<ulong>(std::max(0, _processor.lastPreviewFilterExecutionDurationMS()));
       const auto averageDuration = static_cast<ulong>(std::max(0, _processor.averagePreviewFilterExecutionDuration()));
       const bool keypointBurstEnabled = (lastDuration <= KEYPOINTS_INTERACTIVE_LOWER_DELAY_MS) || ((lastDuration <= KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS) && (averageDuration <= KEYPOINTS_INTERACTIVE_MIDDLE_DELAY_MS));
+      const ulong minInterval = keypointBurstEnabled ? lastDuration : std::max<ulong>(2 * lastDuration, KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS);
       // The event time may go backwards (clock reset/wrap): do not let the unsigned subtraction wrap around by accident
       const ulong msSinceLastBurstEvent = (time >= _lastPreviewKeypointBurstUpdateTime) ? (time - _lastPreviewKeypointBurstUpdateTime) : std::numeric_limits<ulong>::max();
-      if (keypointBurstEnabled && (msSinceLastBurstEvent >= lastDuration)) {
+      if (msSinceLastBurstEvent >= minInterval) {
         onPreviewUpdateRequested(true);
         _lastPreviewKeypointBurstUpdateTime = time;
       }
@@ -1596,6 +1597,3 @@ void MainWindow::closeEvent(QCloseEvent * e)
 }
 
 } // namespace GmicQt
-
-
-
