@@ -1022,16 +1022,14 @@ void PreviewWidget::mouseMoveEvent(QMouseEvent * e)
       QPointF p = pointInWidgetToKeypointPosition(e->pos());
       KeypointList::Keypoint & kp = _keypoints[_movedKeypointIndex];
       kp.setPosition(p);
-      repaint();
+      update();
       if (kp.burst) {
         unsigned char flags = 0;
         if (e->timestamp() - _keypointTimestamp > 15) {
           flags |= KeypointBurstEvent;
+          _keypointTimestamp = e->timestamp();
         }
         emit keypointPositionsChanged(flags, e->timestamp());
-        _keypointTimestamp = e->timestamp();
-      } else {
-        emit keypointPositionsChanged(0, e->timestamp());
       }
     }
     e->accept();
@@ -1453,6 +1451,3 @@ bool PreviewWidget::PreviewPoint::operator==(const PreviewWidget::PreviewPoint &
 }
 
 } // namespace GmicQt
-
-
-
