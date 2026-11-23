@@ -25,6 +25,8 @@
 #ifndef GMIC_QT_GLOBALS_H
 #define GMIC_QT_GLOBALS_H
 
+#include <limits>
+
 #define GMIC_QT_ORGANISATION_NAME "GREYC"
 #define GMIC_QT_ORGANISATION_DOMAIN "greyc.fr"
 #define GMIC_QT_APPLICATION_NAME "gmic_qt"
@@ -55,7 +57,8 @@ const char WarningPrefix = '!';
 #define LANGUAGE_CODE_KEY "Config/LanguageCode"
 #define HIGHDPI_KEY "Config/HighDPIEnabled"
 #define PREVIEW_SPLITTER_KEY "Config/PreviewSplitterType"
-#define INTERNET_NEVER_UPDATE_PERIODICITY std::numeric_limits<int>::max()
+// Parenthesized "max": a "max" macro (windows.h without NOMINMAX) would otherwise break this expression
+#define INTERNET_NEVER_UPDATE_PERIODICITY ((std::numeric_limits<int>::max)())
 #define ONE_DAY_HOURS (24)
 #define ONE_WEEK_HOURS (7 * 24)
 #define TWO_WEEKS_HOURS (14 * 24)
@@ -70,3 +73,6 @@ const char WarningPrefix = '!';
 #define KEYPOINTS_INTERACTIVE_AVERAGING_COUNT 6
 
 #endif // GMIC_QT_GLOBALS_H
+
+
+

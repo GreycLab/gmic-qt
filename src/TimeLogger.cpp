@@ -26,29 +26,47 @@
 #include "TimeLogger.h"
 #include <QDebug>
 #include <QString>
-#include <cassert>
+#include <mutex>
 #include "Common.h"
 #include "Utils.h"
 #include "gmic.h"
 
 namespace GmicQt
 {
+
+namespace
+{
+// The instance and the step counters are shared by all the threads that use the TIMING macro.
+std::mutex & timeLoggerMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+} // namespace
+
 std::unique_ptr<TimeLogger> TimeLogger::_instance = nullptr;
 
 TimeLogger::TimeLogger()
 {
-  QString filename = gmicConfigPath(true) + "timing_log.txt";
-  _file = fopen(filename.toLocal8Bit().constData(), "w");
+  // Without configuration folder, do not create the file in the current folder: timings are only printed.
+  const QString folder = gmicConfigPath(true);
+  if (!folder.isEmpty()) {
+    const QString filename = folder + "timing_log.txt";
+    _file = fopen(filename.toLocal8Bit().constData(), "w");
+  }
   Q_ASSERT_X(_file, __PRETTY_FUNCTION__, "Cannot open log file");
 }
 
 TimeLogger::~TimeLogger()
 {
-  fclose(_file);
+  if (_file) {
+    fclose(_file);
+  }
 }
 
 TimeLogger * TimeLogger::getInstance()
 {
+  std::lock_guard<std::mutex> lock(timeLoggerMutex());
   if (!_instance) {
     _instance = std::unique_ptr<TimeLogger>(new TimeLogger);
   }
@@ -57,6 +75,7 @@ TimeLogger * TimeLogger::getInstance()
 
 void TimeLogger::step(const char * function, int line, const char * filename)
 {
+  std::lock_guard<std::mutex> lock(timeLoggerMutex());
   static cimg_ulong first = 0;
   static cimg_ulong last = 0;
   static unsigned int count = 0;
@@ -64,12 +83,20 @@ void TimeLogger::step(const char * function, int line, const char * filename)
   if (!last) {
     last = first = now;
   }
-  double elapsed = (now - last) / 1000.0;
-  const double total = (now - first) / 1000.0;
-  printf("%02d @%2.3f +%2.3f %s <%s:%d>\n", count, total, elapsed, function, filename, line);
-  fprintf(_file, "%02d @%2.3f +%2.3f %s <%s:%d>\n", count, total, elapsed, function, filename, line);
+  // Computed with doubles: the system clock may go backward, which would wrap around with unsigned integers.
+  const double elapsed = (static_cast<double>(now) - static_cast<double>(last)) / 1000.0;
+  const double total = (static_cast<double>(now) - static_cast<double>(first)) / 1000.0;
+  const char * functionName = function ? function : "?";
+  const char * fileName = filename ? filename : "?";
+  printf("%02u @%2.3f +%2.3f %s <%s:%d>\n", count, total, elapsed, functionName, fileName, line);
+  if (_file) {
+    fprintf(_file, "%02u @%2.3f +%2.3f %s <%s:%d>\n", count, total, elapsed, functionName, fileName, line);
+  }
   ++count;
   last = now;
 }
 
 } // namespace GmicQt
+
+
+

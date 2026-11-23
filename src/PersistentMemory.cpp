@@ -23,6 +23,7 @@
  *
  */
 #include "PersistentMemory.h"
+#include <mutex>
 #include "gmic.h"
 
 namespace GmicQt
@@ -32,9 +33,13 @@ std::unique_ptr<gmic_library::gmic_image<char>> PersistentMemory::_image;
 
 gmic_library::gmic_image<char> & PersistentMemory::image()
 {
-  if (!_image) {
-    _image.reset(new gmic_library::gmic_image<char>);
-  }
+  // image() is called from the filter threads as well as from the GUI thread: the lazy creation must be thread-safe.
+  static std::once_flag created;
+  std::call_once(created, []() {
+    if (!_image) {
+      _image.reset(new gmic_library::gmic_image<char>);
+    }
+  });
   return *_image;
 }
 
@@ -49,3 +54,6 @@ void PersistentMemory::move_from(gmic_library::gmic_image<char> & buffer)
 }
 
 } // namespace GmicQt
+
+
+

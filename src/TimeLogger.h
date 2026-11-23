@@ -41,10 +41,13 @@ private:
   TimeLogger();
   TimeLogger(const TimeLogger &) = delete;
   TimeLogger & operator=(const TimeLogger &) = delete;
-  FILE * _file;
+  FILE * _file = nullptr;
   static std::unique_ptr<TimeLogger> _instance;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_TIMELOGGER_H
+
+
+

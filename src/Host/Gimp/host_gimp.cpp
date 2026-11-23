@@ -61,9 +61,9 @@
 #endif
 
 #if GIMP_CHECK_VERSION(3, 0, 0)
-#define _GimpImagePtr GimpImage *
-#define _GimpLayerPtr GimpLayer *
-#define _GimpItemPtr GimpItem *
+typedef GimpImage * _GimpImagePtr;
+typedef GimpLayer * _GimpLayerPtr;
+typedef GimpItem * _GimpItemPtr;
 #define _GIMP_ITEM(item) GIMP_ITEM(item)
 #define _GIMP_DRAWABLE(drawable) GIMP_DRAWABLE(drawable)
 #define _GIMP_LAYER(layer) GIMP_LAYER(layer)

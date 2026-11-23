@@ -23,8 +23,11 @@ QString FilterTextTranslator::translate(const QString & str, const QString & fil
   QByteArray comment = filterName.toUtf8();
   QString result = QCoreApplication::translate("FilterTextTranslator", text.constData(), comment.constData());
   if (result == str) {
-    return QCoreApplication::translate("FilterTextTranslator", text);
+    return QCoreApplication::translate("FilterTextTranslator", text.constData());
   }
   return result;
 }
 } // namespace GmicQt
+
+
+

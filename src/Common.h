@@ -66,7 +66,7 @@ template <typename T> inline void unused(const T &, ...) {}
 #define TIMING GmicQt::TimeLogger::getInstance()->step(__PRETTY_FUNCTION__, __LINE__, __FILE__)
 #else
 #define TIMING                                                                                                                                                                                         \
-  if (false)                                                                                                                                                                                           \
+  while (false)                                                                                                                                                                                        \
   std::cout << ""
 #endif
 
@@ -81,3 +81,6 @@ template <typename T> inline void unused(const T &, ...) {}
 #endif
 
 #endif // GMIC_QT_COMMON_H
+
+
+

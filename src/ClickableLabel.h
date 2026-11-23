@@ -35,7 +35,7 @@ namespace GmicQt
 class ClickableLabel : public QLabel {
   Q_OBJECT
 public:
-  ClickableLabel(QWidget * parent);
+  explicit ClickableLabel(QWidget * parent = nullptr);
   void mousePressEvent(QMouseEvent * e) override;
 signals:
   void clicked();
@@ -44,3 +44,6 @@ signals:
 } // namespace GmicQt
 
 #endif // GMIC_QT_CLICKABLELABEL_H
+
+
+

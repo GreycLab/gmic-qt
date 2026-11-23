@@ -70,11 +70,15 @@ private slots:
 
 private:
   void cleanupEmptySources();
+  OfficialFilters currentOfficialFilters() const;
   Ui::SourcesWidget * ui;
   QString _newItemText;
   QStringList _sourcesAtOpening;
-  OfficialFilters _officialFiltersAtOpening;
+  OfficialFilters _officialFiltersAtOpening = OfficialFilters::EnabledWithUpdates;
 };
 
 } // namespace GmicQt
 #endif // GMIC_QT_SOURCESWIDGET_H
+
+
+

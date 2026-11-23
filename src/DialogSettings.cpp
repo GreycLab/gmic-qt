@@ -25,7 +25,6 @@
 #include "DialogSettings.h"
 #include <QCloseEvent>
 #include <QSettings>
-#include <limits>
 #include "Common.h"
 #include "Globals.h"
 #include "Host/GmicQtHost.h"
@@ -43,7 +42,9 @@ DialogSettings::DialogSettings(QWidget * parent) : QDialog(parent), ui(new Ui::D
   ui->setupUi(this);
 
   setWindowTitle(tr("Settings"));
-  setWindowIcon(parent->windowIcon());
+  if (parent) {
+    setWindowIcon(parent->windowIcon());
+  }
   adjustSize();
 
   ui->pbUpdate->setIcon(IconLoader::load("view-refresh"));
@@ -59,19 +60,20 @@ DialogSettings::DialogSettings(QWidget * parent) : QDialog(parent), ui(new Ui::D
   for (int i = 0; i < ui->cbUpdatePeriodicity->count(); ++i) {
     if (Settings::updatePeriodicity() == ui->cbUpdatePeriodicity->itemData(i).toInt()) {
       ui->cbUpdatePeriodicity->setCurrentIndex(i);
+      break;
     }
   }
 
   ui->outputMessages->setToolTip(tr("Output messages"));
-  ui->outputMessages->addItem(tr("Quiet (default)"), (int)OutputMessageMode::Quiet);
-  ui->outputMessages->addItem(tr("Verbose (console)"), (int)OutputMessageMode::VerboseConsole);
-  ui->outputMessages->addItem(tr("Verbose (log file)"), (int)OutputMessageMode::VerboseLogFile);
-  ui->outputMessages->addItem(tr("Very verbose (console)"), (int)OutputMessageMode::VeryVerboseConsole);
-  ui->outputMessages->addItem(tr("Very verbose (log file)"), (int)OutputMessageMode::VeryVerboseLogFile);
-  ui->outputMessages->addItem(tr("Debug (console)"), (int)OutputMessageMode::DebugConsole);
-  ui->outputMessages->addItem(tr("Debug (log file)"), (int)OutputMessageMode::DebugLogFile);
+  ui->outputMessages->addItem(tr("Quiet (default)"), static_cast<int>(OutputMessageMode::Quiet));
+  ui->outputMessages->addItem(tr("Verbose (console)"), static_cast<int>(OutputMessageMode::VerboseConsole));
+  ui->outputMessages->addItem(tr("Verbose (log file)"), static_cast<int>(OutputMessageMode::VerboseLogFile));
+  ui->outputMessages->addItem(tr("Very verbose (console)"), static_cast<int>(OutputMessageMode::VeryVerboseConsole));
+  ui->outputMessages->addItem(tr("Very verbose (log file)"), static_cast<int>(OutputMessageMode::VeryVerboseLogFile));
+  ui->outputMessages->addItem(tr("Debug (console)"), static_cast<int>(OutputMessageMode::DebugConsole));
+  ui->outputMessages->addItem(tr("Debug (log file)"), static_cast<int>(OutputMessageMode::DebugLogFile));
   for (int index = 0; index < ui->outputMessages->count(); ++index) {
-    if (ui->outputMessages->itemData(index) == (int)Settings::outputMessageMode()) {
+    if (ui->outputMessages->itemData(index).toInt() == static_cast<int>(Settings::outputMessageMode())) {
       ui->outputMessages->setCurrentIndex(index);
       break;
     }
@@ -173,8 +175,11 @@ void DialogSettings::onPreviewTimeoutChange(int value)
   Settings::setPreviewTimeout(value);
 }
 
-void DialogSettings::onOutputMessageModeChanged(int)
+void DialogSettings::onOutputMessageModeChanged(int index)
 {
+  if (index < 0) { // No current item: currentData() would be an invalid QVariant (converted to 0)
+    return;
+  }
   const OutputMessageMode mode = static_cast<OutputMessageMode>(ui->outputMessages->currentData().toInt());
   Settings::setOutputMessageMode(mode);
   Logger::setMode(mode);
@@ -223,8 +228,11 @@ void DialogSettings::onDarkThemeToggled(bool on)
   QSettings().setValue(DARK_THEME_KEY, on);
 }
 
-void DialogSettings::onUpdatePeriodicityChanged(int)
+void DialogSettings::onUpdatePeriodicityChanged(int index)
 {
+  if (index < 0) { // No current item: currentData() would be an invalid QVariant (converted to 0, i.e. "at launch")
+    return;
+  }
   Settings::setUpdatePeriodicity(ui->cbUpdatePeriodicity->currentData().toInt());
 }
 
@@ -239,3 +247,6 @@ void DialogSettings::onFileDialogsToggled(bool on)
 }
 
 } // namespace GmicQt
+
+
+

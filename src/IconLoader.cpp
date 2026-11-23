@@ -25,6 +25,8 @@
 
 #include "IconLoader.h"
 #include <QFileInfo>
+#include <QImage>
+#include <QRgb>
 #include <QString>
 
 namespace GmicQt
@@ -33,6 +35,9 @@ namespace GmicQt
 QIcon IconLoader::getForDarkTheme(const char * name)
 {
   QPixmap pixmap(darkIconPath(name));
+  if (pixmap.isNull()) { // Missing or unreadable resource
+    return QIcon();
+  }
   QIcon icon(pixmap);
   icon.addPixmap(darkerPixmap(pixmap), QIcon::Disabled, QIcon::Off);
   return icon;
@@ -65,7 +70,7 @@ QPixmap IconLoader::darkerPixmap(const QPixmap & pixmap)
     while (pixel != limit) {
       QRgb grayed;
       if (qAlpha(*pixel) != 0) {
-        grayed = qRgba((int)(0.4 * qRed(*pixel)), (int)(0.4 * qGreen(*pixel)), (int)(0.4 * qBlue(*pixel)), (int)(0.4 * qAlpha((*pixel))));
+        grayed = qRgba(static_cast<int>(0.4 * qRed(*pixel)), static_cast<int>(0.4 * qGreen(*pixel)), static_cast<int>(0.4 * qBlue(*pixel)), static_cast<int>(0.4 * qAlpha(*pixel)));
       } else {
         grayed = qRgba(0, 0, 0, 0);
       }
@@ -85,3 +90,6 @@ QString IconLoader::darkIconPath(const char * name)
 }
 
 } // namespace GmicQt
+
+
+

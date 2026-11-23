@@ -27,6 +27,7 @@
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QPushButton>
@@ -68,34 +69,22 @@ SourcesWidget::SourcesWidget(QWidget * parent) : QWidget(parent), ui(new Ui::Sou
   connect(ui->tbUp, &QPushButton::clicked, this, &SourcesWidget::onMoveUp);
   connect(ui->tbDown, &QPushButton::clicked, this, &SourcesWidget::onMoveDown);
   connect(ui->list, &QListWidget::currentItemChanged, this, &SourcesWidget::onSourceSelected);
-  connect(ui->leURL, &QLineEdit::textChanged, [this](QString text) { //
+  connect(ui->leURL, &QLineEdit::textChanged, [this](const QString & text) { //
     QListWidgetItem * item = ui->list->currentItem();
     if (item) {
-      ui->list->currentItem()->setText(text);
+      item->setText(text);
     }
   });
   ui->list->addItems(_sourcesAtOpening = Settings::filterSources());
-
-#ifdef _IS_WINDOWS_
-  ui->labelVariables->setText(tr("Macros: $HOME %USERPROFILE% $VERSION"));
-#else
-  ui->labelVariables->setText(tr("Macros: $HOME $VERSION"));
-#endif
 
   ui->cbOfficialFilters->addItem(tr("Disable"), int(OfficialFilters::Disabled));
   ui->cbOfficialFilters->addItem(tr("Enable without updates"), int(OfficialFilters::EnabledWithoutUpdates));
   ui->cbOfficialFilters->addItem(tr("Enable with updates (recommended)"), int(OfficialFilters::EnabledWithUpdates));
 
-  switch (_officialFiltersAtOpening = Settings::officialFilterSource()) {
-  case OfficialFilters::Disabled:
-    ui->cbOfficialFilters->setCurrentIndex(0);
-    break;
-  case OfficialFilters::EnabledWithoutUpdates:
-    ui->cbOfficialFilters->setCurrentIndex(1);
-    break;
-  case OfficialFilters::EnabledWithUpdates:
-    ui->cbOfficialFilters->setCurrentIndex(2);
-    break;
+  _officialFiltersAtOpening = Settings::officialFilterSource();
+  const int officialFiltersIndex = ui->cbOfficialFilters->findData(static_cast<int>(_officialFiltersAtOpening));
+  if (officialFiltersIndex >= 0) {
+    ui->cbOfficialFilters->setCurrentIndex(officialFiltersIndex);
   }
 
 #ifdef _IS_WINDOWS_
@@ -143,18 +132,29 @@ QStringList SourcesWidget::defaultList()
   return result;
 }
 
+SourcesWidget::OfficialFilters SourcesWidget::currentOfficialFilters() const
+{
+  // Without current item, currentData() is an invalid QVariant that converts to 0 (i.e., Disabled): do not trust it blindly.
+  bool ok = false;
+  const int value = ui->cbOfficialFilters->currentData().toInt(&ok);
+  if (ok && (value >= static_cast<int>(OfficialFilters::Disabled)) && (value <= static_cast<int>(OfficialFilters::EnabledWithUpdates))) {
+    return static_cast<OfficialFilters>(value);
+  }
+  return _officialFiltersAtOpening;
+}
+
 void SourcesWidget::saveSettings()
 {
   Settings::setFilterSources(list());
-  Settings::setOfficialFilterSource((OfficialFilters)ui->cbOfficialFilters->currentData().toInt());
+  Settings::setOfficialFilterSource(currentOfficialFilters());
 }
 
 bool SourcesWidget::sourcesModified(bool & internetUpdateRequired)
 {
   internetUpdateRequired = false;
   const QStringList currentSourceList = list();
-  const OfficialFilters currentOfficialFilters = OfficialFilters(ui->cbOfficialFilters->currentData().toInt());
-  if ((currentSourceList == _sourcesAtOpening) && (_officialFiltersAtOpening == currentOfficialFilters)) {
+  const OfficialFilters currentFilters = currentOfficialFilters();
+  if ((currentSourceList == _sourcesAtOpening) && (_officialFiltersAtOpening == currentFilters)) {
     return false;
   }
   QSet<QString> remoteSourcesBefore;
@@ -172,8 +172,8 @@ bool SourcesWidget::sourcesModified(bool & internetUpdateRequired)
   if (!(remoteSourcesAfter - remoteSourcesBefore).isEmpty()) {
     internetUpdateRequired = true;
   }
-  if ((currentOfficialFilters == OfficialFilters::EnabledWithUpdates) //
-      && (currentOfficialFilters != _officialFiltersAtOpening)) {
+  if ((currentFilters == OfficialFilters::EnabledWithUpdates) //
+      && (currentFilters != _officialFiltersAtOpening)) {
     internetUpdateRequired = true;
   }
   return true;
@@ -258,7 +258,7 @@ void SourcesWidget::removeCurrentSource()
 void SourcesWidget::onMoveDown()
 {
   int row = ui->list->currentRow();
-  if (row >= ui->list->count() - 1) {
+  if ((row < 0) || (row >= ui->list->count() - 1)) {
     return;
   }
   QString textDown = ui->list->item(row + 1)->text();
@@ -314,3 +314,6 @@ void SourcesWidget::cleanupEmptySources()
 }
 
 } // namespace GmicQt
+
+
+

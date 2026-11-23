@@ -25,12 +25,16 @@
 
 #include "OverrideCursor.h"
 #include <QApplication>
+#include <QCoreApplication>
 
 namespace GmicQt
 {
 
 void OverrideCursor::set(Qt::CursorShape shape)
 {
+  if (!QCoreApplication::instance()) { // The static QGuiApplication functions need an application object
+    return;
+  }
   if (QApplication::overrideCursor() && QApplication::overrideCursor()->shape() == shape) {
     return;
   }
@@ -42,9 +46,15 @@ void OverrideCursor::set(Qt::CursorShape shape)
 
 void OverrideCursor::setNormal()
 {
+  if (!QCoreApplication::instance()) {
+    return;
+  }
   while (QApplication::overrideCursor()) {
     QApplication::restoreOverrideCursor();
   }
 }
 
 } // namespace GmicQt
+
+
+

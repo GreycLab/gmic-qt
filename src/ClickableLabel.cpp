@@ -34,7 +34,12 @@ void ClickableLabel::mousePressEvent(QMouseEvent * e)
 {
   if (e->buttons() & Qt::LeftButton) {
     emit clicked();
+  } else {
+    QLabel::mousePressEvent(e); // Let the event follow its normal course (it is ignored for the other buttons)
   }
 }
 
 } // namespace GmicQt
+
+
+
