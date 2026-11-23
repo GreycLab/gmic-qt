@@ -36,11 +36,12 @@
 namespace GmicQt
 {
 
-ButtonParameter::ButtonParameter(QObject * parent) : AbstractParameter(parent), _value(false), _pushButton(nullptr), _alignment(Qt::AlignHCenter) {}
+ButtonParameter::ButtonParameter(QObject * parent) : AbstractParameter(parent), _value(false), _alignment(Qt::AlignHCenter) {}
 
 ButtonParameter::~ButtonParameter()
 {
-  delete _pushButton;
+  // Deleting a null (or already destroyed, thanks to QPointer) widget is harmless.
+  delete _pushButton.data();
 }
 
 int ButtonParameter::size() const
@@ -56,11 +57,14 @@ bool ButtonParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _pushButton;
-  _pushButton = nullptr;
-  _pushButton = new QPushButton(_text, widget);
-  _pushButton->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-  _grid->addWidget(_pushButton, row, 0, 1, 3, _alignment);
+  delete _pushButton.data();
+  // A single '&' would be interpreted as a keyboard mnemonic marker (and would not be displayed)
+  QString label = _text;
+  label.replace("&", "&&");
+  QPushButton * button = new QPushButton(label, widget);
+  _pushButton = button;
+  button->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+  _grid->addWidget(button, row, 0, 1, 3, _alignment);
   connectButton();
   return true;
 }
@@ -144,3 +148,6 @@ bool ButtonParameter::initFromText(const QString & filterName, const char * text
 }
 
 } // namespace GmicQt
+
+
+

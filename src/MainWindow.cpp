@@ -967,7 +967,20 @@ void MainWindow::expandOrCollapseFolders()
 
 void MainWindow::search(const QString & text)
 {
-  _filtersPresenter->applySearchCriterion(text);
+  // Applying a search criterion rebuilds the whole filters tree. Doing it at each keystroke makes typing
+  // sluggish: the search is applied once the user pauses (the text is cleared at once, though).
+  const int searchDelayMS = 150;
+  if (!_searchTimer) {
+    _searchTimer = new QTimer(this);
+    _searchTimer->setSingleShot(true);
+    connect(_searchTimer, &QTimer::timeout, this, [this]() { _filtersPresenter->applySearchCriterion(ui->searchField->text()); });
+  }
+  if (text.isEmpty()) {
+    _searchTimer->stop();
+    _filtersPresenter->applySearchCriterion(text);
+    return;
+  }
+  _searchTimer->start(searchDelayMS);
 }
 
 void MainWindow::onApplyClicked()
@@ -1582,3 +1595,6 @@ void MainWindow::closeEvent(QCloseEvent * e)
 }
 
 } // namespace GmicQt
+
+
+

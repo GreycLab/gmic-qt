@@ -25,7 +25,10 @@
 #ifndef GMIC_QT_MULTILINETEXTPARAMETERWIDGET_H
 #define GMIC_QT_MULTILINETEXTPARAMETERWIDGET_H
 
+#include <QString>
 #include <QWidget>
+class QEvent;
+class QObject;
 
 namespace Ui
 {
@@ -57,3 +60,6 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_MULTILINETEXTPARAMETERWIDGET_H
+
+
+

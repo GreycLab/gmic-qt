@@ -32,11 +32,12 @@
 namespace GmicQt
 {
 
-SeparatorParameter::SeparatorParameter(QObject * parent) : AbstractParameter(parent), _frame(nullptr) {}
+SeparatorParameter::SeparatorParameter(QObject * parent) : AbstractParameter(parent) {}
 
 SeparatorParameter::~SeparatorParameter()
 {
-  delete _frame;
+  // Deleting a null (or already destroyed, thanks to QPointer) widget is harmless.
+  delete _frame.data();
 }
 
 int SeparatorParameter::size() const
@@ -52,20 +53,20 @@ bool SeparatorParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _frame;
-  _frame = nullptr;
-  _frame = new QFrame(widget);
+  delete _frame.data();
+  QFrame * frame = new QFrame(widget);
+  _frame = frame;
   QSizePolicy sizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
   sizePolicy.setHorizontalStretch(0);
   sizePolicy.setVerticalStretch(0);
-  sizePolicy.setHeightForWidth(_frame->sizePolicy().hasHeightForWidth());
-  _frame->setSizePolicy(sizePolicy);
-  _frame->setFrameShape(QFrame::HLine);
-  _frame->setFrameShadow(QFrame::Sunken);
+  sizePolicy.setHeightForWidth(frame->sizePolicy().hasHeightForWidth());
+  frame->setSizePolicy(sizePolicy);
+  frame->setFrameShape(QFrame::HLine);
+  frame->setFrameShadow(QFrame::Sunken);
   if (Settings::darkThemeEnabled()) {
-    _frame->setStyleSheet("QFrame{ border-top: 0px none #a0a0a0; border-bottom: 2px solid rgb(160,160,160);}");
+    frame->setStyleSheet("QFrame{ border-top: 0px none #a0a0a0; border-bottom: 2px solid rgb(160,160,160);}");
   }
-  _grid->addWidget(_frame, row, 0, 1, 3);
+  _grid->addWidget(frame, row, 0, 1, 3);
   return true;
 }
 
@@ -85,9 +86,12 @@ void SeparatorParameter::reset() {}
 
 bool SeparatorParameter::initFromText(const QString & /* filterName */, const char * text, int & textLength)
 {
-  QStringList list = parseText("separator", text, textLength);
-  unused(list);
-  return true;
+  // An empty list means a parse error, which must be reported like for the other parameters.
+  const QStringList list = parseText("separator", text, textLength);
+  return !list.isEmpty();
 }
 
 } // namespace GmicQt
+
+
+

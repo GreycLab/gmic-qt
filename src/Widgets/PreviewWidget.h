@@ -262,6 +262,13 @@ private:
   QImage _previewQImage; // Cache: preview image resized to _imagePosition and converted for display
   QSize _previewQImageSize;
   bool _previewQImageIsValid;
+  // Cache: original image resized to _imagePosition and converted for display. Without it, each repaint
+  // (e.g., at each mouse move while the splitter is dragged) copied, resized and converted the whole crop.
+  QImage _originalQImage;
+  QSize _originalQImageSize;
+  quint64 _originalQImageGeneration = 0;
+  bool _originalQImageIsValid = false;
+  bool _originalImageHasAlpha = false;
   KeypointList _keypoints;
   int _movedKeypointIndex;
   QPoint _movedKeypointOrigin;
@@ -278,5 +285,8 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_PREVIEWWIDGET_H
+
+
+
 
 

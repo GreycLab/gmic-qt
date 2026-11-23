@@ -25,6 +25,7 @@
 #ifndef GMIC_QT_LINKPARAMETER_H
 #define GMIC_QT_LINKPARAMETER_H
 
+#include <QPointer>
 #include <Qt>
 #include "AbstractParameter.h"
 class QLabel;
@@ -48,7 +49,7 @@ public slots:
   void onLinkActivated(const QString & link);
 
 private:
-  QLabel * _label;
+  QPointer<QLabel> _label; // Becomes null if the label is destroyed with its parent widget
   QString _text;
   QString _url;
   Qt::AlignmentFlag _alignment;
@@ -57,3 +58,6 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_LINKPARAMETER_H
+
+
+

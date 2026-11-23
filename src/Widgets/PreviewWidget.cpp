@@ -533,21 +533,34 @@ void PreviewWidget::paintPreview(QPainter & painter)
 
 void PreviewWidget::paintOriginalImage(QPainter & painter)
 {
-  gmic_image<float> image;
-  getOriginalImageCrop(image);
+  originalImageCropSize(); // Refreshes the crop of the active layer if the visible rectangle has changed
   updateOriginalImagePosition();
-  if ((!image.width() && !image.height()) || _imagePosition.isEmpty()) {
+  const QSize targetSize = _imagePosition.size();
+  if (targetSize.isEmpty()) {
     painter.fillRect(rect(), QBrush(_transparency));
-  } else {
-    image.resize(_imagePosition.width(), _imagePosition.height(), 1, -100, 1);
-    if (hasAlphaChannel(image)) {
-      painter.fillRect(_imagePosition, QBrush(_transparency));
-    }
-    QImage qimage;
-    convertGmicImageToQImage(image, qimage);
-    painter.drawImage(_imagePosition, qimage);
-    paintKeypoints(painter);
+    return;
   }
+  if (!_originalQImageIsValid || (_originalQImageSize != targetSize) || (_originalQImageGeneration != CroppedActiveLayerProxy::generation())) {
+    _originalQImageIsValid = false;
+    gmic_image<float> image;
+    getOriginalImageCrop(image);
+    if (!image.width() && !image.height()) {
+      _originalQImage = QImage();
+      painter.fillRect(rect(), QBrush(_transparency));
+      return;
+    }
+    image.resize(targetSize.width(), targetSize.height(), 1, -100, 1);
+    _originalImageHasAlpha = hasAlphaChannel(image);
+    convertGmicImageToQImage(image, _originalQImage);
+    _originalQImageSize = targetSize;
+    _originalQImageGeneration = CroppedActiveLayerProxy::generation();
+    _originalQImageIsValid = true;
+  }
+  if (_originalImageHasAlpha) {
+    painter.fillRect(_imagePosition, QBrush(_transparency));
+  }
+  painter.drawImage(_imagePosition, _originalQImage);
+  paintKeypoints(painter);
 }
 
 void PreviewWidget::paintSplittedPreview(QPainter & painter)
@@ -1440,3 +1453,6 @@ bool PreviewWidget::PreviewPoint::operator==(const PreviewWidget::PreviewPoint &
 }
 
 } // namespace GmicQt
+
+
+

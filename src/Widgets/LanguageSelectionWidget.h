@@ -40,7 +40,7 @@ class LanguageSelectionWidget : public QWidget {
   Q_OBJECT
 public:
   explicit LanguageSelectionWidget(QWidget * parent);
-  ~LanguageSelectionWidget();
+  ~LanguageSelectionWidget() override;
   bool translateFiltersEnabled() const;
   void enableFilterTranslation(bool on);
 
@@ -53,9 +53,12 @@ private slots:
 private:
   Ui::LanguageSelectionWidget * ui;
   const QMap<QString, QString> & _code2name;
-  bool _systemDefaultIsAvailable;
+  bool _systemDefaultIsAvailable = false;
 };
 
 } // namespace GmicQt
 
 #endif // LANGUAGESELECTIONWIDGET_H
+
+
+

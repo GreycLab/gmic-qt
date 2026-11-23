@@ -50,7 +50,7 @@ LanguageSelectionWidget::LanguageSelectionWidget(QWidget * parent) //
   QString lang = LanguageSettings::systemDefaultAndAvailableLanguageCode();
   _systemDefaultIsAvailable = !lang.isEmpty();
   if (_systemDefaultIsAvailable) {
-    ui->comboBox->insertItem(0, QString(tr("System default (%1)")).arg(_code2name[lang]), QVariant(QString()));
+    ui->comboBox->insertItem(0, tr("System default (%1)").arg(_code2name.value(lang)), QVariant(QString()));
   }
 
   if (Settings::darkThemeEnabled()) {
@@ -108,6 +108,9 @@ void LanguageSelectionWidget::selectLanguage(const QString & code)
 
 void LanguageSelectionWidget::onLanguageSelectionChanged(int index)
 {
+  if (index < 0) { // No current item (e.g., the combo box is being cleared): itemData() would be empty, i.e. "system default"
+    return;
+  }
   QString lang = ui->comboBox->itemData(index).toString();
   Settings::setLanguageCode(lang);
   if (lang.isEmpty()) {
@@ -127,3 +130,6 @@ void LanguageSelectionWidget::onCheckboxToggled(bool on)
 }
 
 } // namespace GmicQt
+
+
+

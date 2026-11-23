@@ -35,15 +35,18 @@ namespace GmicQt
 class TreeView : public QTreeView {
   Q_OBJECT
 public:
-  TreeView(QWidget * parent);
+  explicit TreeView(QWidget * parent = nullptr);
   ~TreeView() override;
-  void keyPressEvent(QKeyEvent * event) override;
 signals:
   void returnKeyPressed();
 
-private:
+protected:
+  void keyPressEvent(QKeyEvent * event) override;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_TREEVIEW_H
+
+
+

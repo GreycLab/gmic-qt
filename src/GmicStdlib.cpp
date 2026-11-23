@@ -35,6 +35,7 @@
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
+#include <limits>
 #include "Common.h"
 #include "GmicQt.h"
 #include "Logger.h"
@@ -46,24 +47,38 @@ namespace GmicQt
 
 QByteArray GmicStdLib::Array;
 
+namespace
+{
+// The G'MIC standard library is a few megabytes long: refuse to load a much larger "update" file.
+const qint64 MaxStdlibFileSize = 128 * 1024 * 1024;
+} // namespace
+
 void GmicStdLib::loadStdLib() // TODO : Remove
 {
-  QString path = QString("%1update%2.gmic").arg(gmicConfigPath(false)).arg(gmic_version);
-  QFileInfo info(path);
-  QFile stdlib(path);
-  if ((info.size() == 0) || !stdlib.open(QFile::ReadOnly)) {
-    gmic_image<char> stdlib_h = gmic::decompress_stdlib();
-    if (stdlib_h.size() < 2) { // Nothing (or only the terminating null character): Array[Array.size() - 1] would be invalid
-      Logger::error("Could not decompress gmic builtin stdlib");
-      Array.clear();
-      return;
+  // Without configuration folder, the path would be relative: a file of the current folder would be read.
+  const QString folder = gmicConfigPath(false);
+  if (!folder.isEmpty()) {
+    const QString path = QString("%1update%2.gmic").arg(folder).arg(gmic_version);
+    const qint64 fileSize = QFileInfo(path).size();
+    QFile stdlib(path);
+    if ((fileSize > 0) && (fileSize <= MaxStdlibFileSize) && stdlib.open(QFile::ReadOnly)) {
+      Array = stdlib.readAll();
+      if (!Array.isEmpty()) { // Otherwise (read error), fall back to the built-in library
+        return;
+      }
     }
-    // Deep copy: fromRawData() would reference a buffer which is released when stdlib_h goes out of scope
-    Array = QByteArray(stdlib_h.data(), int(stdlib_h.size()));
-    Array[Array.size() - 1] = '\n';
-  } else {
-    Array = stdlib.readAll();
   }
+  gmic_image<char> stdlib_h = gmic::decompress_stdlib();
+  // Nothing (or only the terminating null character): Array[Array.size() - 1] would be invalid.
+  // Too large: the size could not be stored in a QByteArray.
+  if ((stdlib_h.size() < 2) || (stdlib_h.size() >= static_cast<unsigned long long>(std::numeric_limits<int>::max()))) {
+    Logger::error("Could not decompress gmic builtin stdlib");
+    Array.clear();
+    return;
+  }
+  // Deep copy: fromRawData() would reference a buffer which is released when stdlib_h goes out of scope
+  Array = QByteArray(stdlib_h.data(), static_cast<int>(stdlib_h.size()));
+  Array[Array.size() - 1] = '\n';
 }
 
 QString GmicStdLib::substituteSourceVariables(QString text)
@@ -89,7 +104,7 @@ QString GmicStdLib::substituteSourceVariables(QString text)
       name = match.captured(2); // ${NAME} form
     }
     QString replacement;
-    if (name == QString("VERSION")) {
+    if (name == QLatin1String("VERSION")) {
       replacement = QString::number(GmicQt::GmicVersion);
     } else {
       const QByteArray value = qgetenv(name.toLocal8Bit().constData());
@@ -128,6 +143,9 @@ QByteArray GmicStdLib::hash()
 }
 
 } // namespace GmicQt
+
+
+
 
 
 

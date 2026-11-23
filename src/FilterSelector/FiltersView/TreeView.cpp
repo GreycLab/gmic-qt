@@ -24,6 +24,7 @@
  */
 #include "TreeView.h"
 #include <QKeyEvent>
+#include <QPointer>
 
 namespace GmicQt
 {
@@ -32,12 +33,20 @@ TreeView::TreeView(QWidget * parent) : QTreeView(parent) {}
 
 void TreeView::keyPressEvent(QKeyEvent * event)
 {
-  if (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return) {
+  if (!event->isAutoRepeat() && (event->key() == Qt::Key_Enter || event->key() == Qt::Key_Return)) {
+    // Holding the key down must not trigger the action repeatedly.
+    QPointer<TreeView> guard(this);
     emit returnKeyPressed();
+    if (!guard) { // A slot may have destroyed the view
+      return;
+    }
   }
   QTreeView::keyPressEvent(event);
 }
 
-TreeView::~TreeView() {}
+TreeView::~TreeView() = default;
 
 } // namespace GmicQt
+
+
+

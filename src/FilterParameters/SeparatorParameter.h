@@ -25,6 +25,7 @@
 #ifndef GMIC_QT_SEPARATORPARAMETER_H
 #define GMIC_QT_SEPARATORPARAMETER_H
 
+#include <QPointer>
 #include "AbstractParameter.h"
 class QFrame;
 
@@ -34,7 +35,7 @@ namespace GmicQt
 class SeparatorParameter : public AbstractParameter {
   Q_OBJECT
 public:
-  SeparatorParameter(QObject * parent);
+  explicit SeparatorParameter(QObject * parent);
   ~SeparatorParameter() override;
   int size() const override;
   bool addTo(QWidget *, int row) override;
@@ -45,9 +46,12 @@ public:
   bool initFromText(const QString & filterName, const char * text, int & textLength) override;
 
 private:
-  QFrame * _frame;
+  QPointer<QFrame> _frame; // Becomes null if the frame is destroyed with its parent widget
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_SEPARATORPARAMETER_H
+
+
+

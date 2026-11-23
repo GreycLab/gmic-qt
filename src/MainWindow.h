@@ -168,6 +168,7 @@ private:
   QIcon _collapseIcon;
   QIcon * _expandCollapseIcon;
   int _messageTimerID;
+  QTimer * _searchTimer = nullptr; // Delays the search until the user pauses typing
   bool _lastExecutionOK;
   bool _newSession;
   bool _gtkFavesShouldBeImported;
@@ -184,3 +185,6 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_MAINWINDOW_H
+
+
+

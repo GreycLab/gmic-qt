@@ -25,6 +25,7 @@
 #ifndef GMIC_QT_BUTTONPARAMETER_H
 #define GMIC_QT_BUTTONPARAMETER_H
 
+#include <QPointer>
 #include <QString>
 #include <Qt>
 #include "AbstractParameter.h"
@@ -38,7 +39,7 @@ namespace GmicQt
 class ButtonParameter : public AbstractParameter {
   Q_OBJECT
 public:
-  ButtonParameter(QObject * parent);
+  explicit ButtonParameter(QObject * parent);
   ~ButtonParameter() override;
   virtual int size() const override;
   bool addTo(QWidget *, int row) override;
@@ -57,10 +58,13 @@ private:
   void disconnectButton();
   bool _value;
   QString _text;
-  QPushButton * _pushButton;
+  QPointer<QPushButton> _pushButton; // Becomes null if the button is destroyed with its parent widget
   Qt::AlignmentFlag _alignment;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_BUTTONPARAMETER_H
+
+
+

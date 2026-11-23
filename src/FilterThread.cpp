@@ -241,7 +241,17 @@ void FilterThread::run()
     // These buffers must outlive the calls below which use their content
     const QByteArray environment = _environment.toLocal8Bit();
     const QByteArray commandLine = fullCommandLine.toLocal8Bit();
+    if (_gmicAbort) { // Aborted before the start: skip the (costly) initialization of the interpreter
+      _images->assign();
+      _imageNames->assign();
+      return;
+    }
     gmic gmicInstance(environment.isEmpty() ? nullptr : environment.constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
+    if (_gmicAbort) { // Aborted during the initialization
+      _images->assign();
+      _imageNames->assign();
+      return;
+    }
     if (PersistentMemory::image()) {
       if (*PersistentMemory::image() == gmic_store) {
         gmicInstance.set_variable("_persistent", PersistentMemory::image());
@@ -278,3 +288,6 @@ void FilterThread::run()
 }
 
 } // namespace GmicQt
+
+
+

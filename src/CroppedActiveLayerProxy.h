@@ -26,6 +26,7 @@
 #define GMIC_QT_CROPPEDACTIVELAYERPROXY_H
 
 #include <QSize>
+#include <QtGlobal>
 #include <memory>
 #include "GmicQt.h"
 
@@ -44,6 +45,8 @@ public:
   static void get(gmic_library::gmic_image<gmic_pixel_type> & image, double x, double y, double width, double height);
   static QSize getSize(double x, double y, double width, double height);
   static void clear();
+  // Changes each time the content of the cache changes: lets users cache what they derive from the image.
+  static quint64 generation();
 
 private:
   static void update(double x, double y, double width, double height);
@@ -52,8 +55,12 @@ private:
   static double _y;
   static double _width;
   static double _height;
+  static quint64 _generation;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_CROPPEDACTIVELAYERPROXY_H
+
+
+

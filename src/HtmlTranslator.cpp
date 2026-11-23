@@ -25,7 +25,9 @@
 
 #include "HtmlTranslator.h"
 #include <QDebug>
+#include <QHash>
 #include <QRegularExpression>
+#include <mutex>
 #include "Common.h"
 #include "gmic.h"
 
@@ -33,6 +35,50 @@ namespace GmicQt
 {
 
 QTextDocument HtmlTranslator::_document;
+
+namespace
+{
+// QTextDocument is neither thread-safe nor cheap: setHtml() is by far the most expensive operation
+// of the filters tree (it was called for every item, each time the tree was rebuilt, i.e. at each
+// keystroke in the search field). Results are therefore memoized, and plain strings skip it.
+std::mutex & documentMutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+QHash<QString, QString> & memoizedResults()
+{
+  static QHash<QString, QString> results;
+  return results;
+}
+
+const int MaxMemoizedResults = 50000;
+
+/**
+ * True if QTextDocument::setHtml() followed by toPlainText() would give back exactly the same text:
+ * no markup or entity ('&' or '<'), no character that would be altered by the conversion (control
+ * characters, line and paragraph separators, non-breaking spaces...) and no white space which would be
+ * collapsed or trimmed (only isolated spaces between two other characters are kept as is).
+ */
+bool isUnalteredByHtmlConversion(const QString & str)
+{
+  const int size = str.size();
+  QChar previous;
+  for (int i = 0; i < size; ++i) {
+    const QChar c = str.at(i);
+    const ushort u = c.unicode();
+    if ((u == '&') || (u == '<') || (u < 0x20) || (u == 0x7F) || (u == 0x2028) || (u == 0x2029) || (u == 0xFFFC)) {
+      return false;
+    }
+    if (c.isSpace() && ((u != ' ') || (i == 0) || (i == size - 1) || (previous == QChar(' ')))) {
+      return false;
+    }
+    previous = c;
+  }
+  return true;
+}
+} // namespace
 
 QString HtmlTranslator::removeTags(QString str)
 {
@@ -45,8 +91,22 @@ QString HtmlTranslator::removeTags(QString str)
 QString HtmlTranslator::html2txt(const QString & str, bool force)
 {
   if (force || hasHtmlEntities(str)) {
+    if (isUnalteredByHtmlConversion(str)) {
+      return fromUtf8Escapes(str);
+    }
+    std::lock_guard<std::mutex> lock(documentMutex());
+    QHash<QString, QString> & memo = memoizedResults();
+    const auto it = memo.constFind(str);
+    if (it != memo.constEnd()) {
+      return it.value();
+    }
     _document.setHtml(str);
-    return fromUtf8Escapes(_document.toPlainText());
+    const QString result = fromUtf8Escapes(_document.toPlainText());
+    if (memo.size() >= MaxMemoizedResults) {
+      memo.clear();
+    }
+    memo.insert(str, result);
+    return result;
   }
   return fromUtf8Escapes(str);
 }
@@ -73,5 +133,8 @@ QString HtmlTranslator::fromUtf8Escapes(const QString & str)
 }
 
 } // namespace GmicQt
+
+
+
 
 

@@ -49,6 +49,7 @@ double CroppedActiveLayerProxy::_x = -1.0;
 double CroppedActiveLayerProxy::_y = -1.0;
 double CroppedActiveLayerProxy::_width = -1.0;
 double CroppedActiveLayerProxy::_height = -1.0;
+quint64 CroppedActiveLayerProxy::_generation = 0;
 std::unique_ptr<gmic_library::gmic_image<gmic_pixel_type>> CroppedActiveLayerProxy::_cachedImage(new gmic_library::gmic_image<gmic_pixel_type>);
 
 void CroppedActiveLayerProxy::get(gmic_library::gmic_image<gmic_pixel_type> & image, double x, double y, double width, double height)
@@ -69,9 +70,16 @@ QSize CroppedActiveLayerProxy::getSize(double x, double y, double width, double 
   return QSize(_cachedImage->width(), _cachedImage->height());
 }
 
+quint64 CroppedActiveLayerProxy::generation()
+{
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
+  return _generation;
+}
+
 void CroppedActiveLayerProxy::clear()
 {
   std::lock_guard<std::recursive_mutex> lock(proxyMutex());
+  ++_generation;
   _cachedImage->assign();
   _x = _y = _width = _height = -1.0;
 }
@@ -88,6 +96,7 @@ void CroppedActiveLayerProxy::update(double x, double y, double width, double he
   if (images.size() > 0) {
     GmicQtHost::applyColorProfile(images.front());
     _cachedImage->swap(images.front());
+    ++_generation;
     _x = x;
     _y = y;
     _width = width;
@@ -97,3 +106,6 @@ void CroppedActiveLayerProxy::update(double x, double y, double width, double he
 }
 
 } // namespace GmicQt
+
+
+

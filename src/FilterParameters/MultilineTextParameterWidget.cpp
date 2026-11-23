@@ -54,7 +54,10 @@ QString MultilineTextParameterWidget::text() const
 
 void MultilineTextParameterWidget::setText(const QString & text)
 {
-  ui->textEdit->document()->setPlainText(text);
+  // Do not reset the cursor position and the undo history when the text is unchanged
+  if (text != ui->textEdit->document()->toPlainText()) {
+    ui->textEdit->document()->setPlainText(text);
+  }
 }
 
 void MultilineTextParameterWidget::onUpdate(bool)
@@ -64,10 +67,14 @@ void MultilineTextParameterWidget::onUpdate(bool)
 
 bool MultilineTextParameterWidget::eventFilter(QObject * obj, QEvent * event)
 {
-  if (event->type() == QEvent::KeyPress) {
-    auto keyEvent = dynamic_cast<QKeyEvent *>(event);
-    if (keyEvent && (keyEvent->modifiers() & Qt::ControlModifier) && (keyEvent->key() == Qt::Key_Enter || keyEvent->key() == Qt::Key_Return)) {
-      onUpdate(true);
+  if ((obj == ui->textEdit) && (event->type() == QEvent::KeyPress)) {
+    const QKeyEvent * keyEvent = static_cast<const QKeyEvent *>(event); // The event type has just been checked
+    if ((keyEvent->modifiers() & Qt::ControlModifier) && (keyEvent->key() == Qt::Key_Enter || keyEvent->key() == Qt::Key_Return)) {
+      // Holding the keys down must not trigger a new update (i.e., a new filter run) for each auto-repeat.
+      // The event is consumed anyway: no line break must be inserted in the text.
+      if (!keyEvent->isAutoRepeat()) {
+        onUpdate(true);
+      }
       return true;
     }
   }
@@ -75,3 +82,6 @@ bool MultilineTextParameterWidget::eventFilter(QObject * obj, QEvent * event)
 }
 
 } // namespace GmicQt
+
+
+
