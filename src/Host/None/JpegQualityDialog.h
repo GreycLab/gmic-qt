@@ -18,11 +18,6 @@ public:
   void setQuality(int quality);
   static int ask(QWidget * parent, int value = -1);
 
-protected:
-  void closeEvent(QCloseEvent *) override;
-private slots:
-  void makePermanent(bool);
-
 private:
   Ui::JpegQualityDialog * ui;
   static int _permanentQuality;
@@ -30,3 +25,5 @@ private:
 };
 
 #endif // JPEGQUALITYDIALOG_H
+
+

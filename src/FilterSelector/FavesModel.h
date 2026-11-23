@@ -46,7 +46,7 @@ public:
 
     const QString & name() const;
     const QString & plainText() const;
-    const QString absolutePath() const;
+    QString absolutePath() const;
     const QString & originalName() const;
     const QString & originalHash() const;
     const QString & command() const;
@@ -98,7 +98,7 @@ public:
   const_iterator findFaveFromHash(const QString &) const;
   const_iterator findFaveFromPlainText(const QString &) const;
   const Fave & getFaveFromHash(const QString & hash) const;
-  QString uniqueName(const QString & name, const QString & faveHashToIgnore);
+  QString uniqueName(const QString & name, const QString & faveHashToIgnore) const;
   static const size_t NoIndex;
 
 private:
@@ -131,3 +131,5 @@ FavesModel::const_iterator FavesModel::end() const
 } // namespace GmicQt
 
 #endif // GMIC_QT_FAVESMODEL_H
+
+

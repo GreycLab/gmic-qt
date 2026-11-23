@@ -31,7 +31,7 @@
 #include <QPalette>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
-#include <QToolButton>
+#include <QLayout>
 #include "Common.h"
 #include "IconLoader.h"
 #include "Settings.h"
@@ -47,34 +47,19 @@ SearchFieldWidget::SearchFieldWidget(QWidget * parent) : QWidget(parent), ui(new
   _findIcon = IconLoader::load("edit-find");
   _empty = true;
 
-#if QT_VERSION_GTE(5, 2, 0)
-  auto hbox = dynamic_cast<QHBoxLayout *>(layout());
-  if (hbox) {
+  // _lineEdit used to be left uninitialized (and then used) when the layout was not a QHBoxLayout.
+  _lineEdit = new QLineEdit(this);
+  QLayout * mainLayout = layout();
+  if (!mainLayout) {
+    mainLayout = new QHBoxLayout(this);
+  }
+  if (auto hbox = dynamic_cast<QHBoxLayout *>(mainLayout)) {
     hbox->setContentsMargins(0, 0, 0, 0);
     hbox->setSpacing(0);
-    hbox->addWidget(_lineEdit = new QLineEdit(this));
-    _action = _lineEdit->addAction(IconLoader::load("edit-find"), QLineEdit::TrailingPosition);
-    connect(_action, &QAction::triggered, _lineEdit, &QLineEdit::clear);
   }
-#else
-  QFrame * frame = new QFrame(this);
-  layout()->addWidget(frame);
-  frame->setFrameShape(QFrame::StyledPanel);
-  frame->setStyleSheet(QString("background:%1").arg(frame->palette().base().color().name()));
-  QHBoxLayout * hbox = new QHBoxLayout;
-  frame->setLayout(hbox);
-  hbox->setMargin(2);
-
-  _lineEdit = new QLineEdit(frame);
-  hbox->addWidget(_lineEdit);
-  _button = new QToolButton(frame);
-  hbox->addWidget(_button);
-
-  _button->setStyleSheet("border:none");
-  _lineEdit->setFrame(false);
-  _button->setIcon(_findIcon);
-  connect(_button, &QToolButton::clicked, _lineEdit, &QLineEdit::clear);
-#endif
+  mainLayout->addWidget(_lineEdit);
+  _action = _lineEdit->addAction(_findIcon, QLineEdit::TrailingPosition);
+  connect(_action, &QAction::triggered, _lineEdit, &QLineEdit::clear);
   connect(_lineEdit, &QLineEdit::textChanged, this, &SearchFieldWidget::textChanged);
   connect(_lineEdit, &QLineEdit::textChanged, this, &SearchFieldWidget::onTextChanged);
   _lineEdit->setPlaceholderText(tr("Search"));
@@ -103,7 +88,6 @@ QString SearchFieldWidget::text() const
 
 void SearchFieldWidget::onTextChanged(const QString & str)
 {
-#if QT_VERSION_GTE(5, 2, 0)
   if (str.isEmpty()) {
     _empty = true;
     _action->setIcon(_findIcon);
@@ -113,17 +97,6 @@ void SearchFieldWidget::onTextChanged(const QString & str)
     }
     _empty = false;
   }
-#else
-  if (str.isEmpty()) {
-    _empty = true;
-    _button->setIcon(_findIcon);
-  } else {
-    if (_empty) {
-      _button->setIcon(_clearIcon);
-      _empty = false;
-    }
-  }
-#endif
 }
 
 void SearchFieldWidget::clear()
@@ -132,3 +105,5 @@ void SearchFieldWidget::clear()
 }
 
 } // namespace GmicQt
+
+

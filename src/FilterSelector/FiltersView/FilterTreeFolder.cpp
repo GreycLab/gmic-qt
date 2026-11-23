@@ -82,11 +82,14 @@ bool FilterTreeFolder::isFaveFolder() const
 
 bool FilterTreeFolder::operator<(const QStandardItem & other) const
 {
-  auto otherFolder = dynamic_cast<const FilterTreeFolder *>(&other);
-  auto otherItem = dynamic_cast<const FilterTreeItem *>(&other);
-  Q_ASSERT_X(otherFolder || otherItem, "FilterTreeItem::operator<", "Wrong item types");
-  bool otherIsWarning = (otherFolder && otherFolder->isWarning()) || (otherItem && otherItem->isWarning());
-  bool otherIsFaveFolder = otherFolder && otherFolder->isFaveFolder();
+  const auto otherFolder = dynamic_cast<const FilterTreeFolder *>(&other);
+  const auto otherItem = dynamic_cast<const FilterTreeItem *>(&other);
+  Q_ASSERT_X(otherFolder || otherItem, "FilterTreeFolder::operator<", "Wrong item types");
+  if (!otherFolder && !otherItem) {
+    return false; // Unknown type of item (the assertion above is not active in release mode)
+  }
+  const bool otherIsWarning = (otherFolder && otherFolder->isWarning()) || (otherItem && otherItem->isWarning());
+  const bool otherIsFaveFolder = otherFolder && otherFolder->isFaveFolder();
 
   // Warnings first
   if (isWarning() && !otherIsWarning) {
@@ -102,15 +105,14 @@ bool FilterTreeFolder::operator<(const QStandardItem & other) const
   if (!_isFaveFolder && otherIsFaveFolder) {
     return false;
   }
-  // Then folders
+  // Then folders (before filters)
   if (!otherFolder) {
     return true;
   }
   // Other cases follow lexicographic order
-  if (otherFolder) {
-    return plainText().localeAwareCompare(otherFolder->plainText()) < 0;
-  }
-  return plainText().localeAwareCompare(otherItem->plainText()) < 0;
+  return plainText().localeAwareCompare(otherFolder->plainText()) < 0;
 }
 
 } // namespace GmicQt
+
+

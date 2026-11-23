@@ -30,6 +30,7 @@
 #include <QMessageBox>
 #include <QString>
 #include <QStringList>
+#include <algorithm>
 #include "Common.h"
 #include "JpegQualityDialog.h"
 #include "Settings.h"
@@ -100,10 +101,11 @@ void ImageDialog::addImage(const gmic_library::gmic_image<float> & image, const 
 
 const QImage & ImageDialog::currentImage() const
 {
+  static const QImage NullImage;
   QWidget * widget = _tabWidget->currentWidget();
   auto view = dynamic_cast<ImageView *>(widget);
   Q_ASSERT_X(view, __FUNCTION__, "Widget is not an ImageView");
-  return view->image();
+  return view ? view->image() : NullImage; // No tab (or not an ImageView): view would be null in release mode
 }
 
 int ImageDialog::currentImageIndex() const
@@ -150,7 +152,11 @@ void ImageDialog::onSaveAs()
     settings.setValue("Standalone/SaveAsSelectedFilter", selectedFilter);
     QString extension = selectedFilter.split("*").back();
     extension.chop(1);
-    if (!extensions.contains(QFileInfo(filename).suffix())) {
+    // The suffix is compared in lower case, like the extensions: "IMAGE.PNG" became "IMAGE.PNG.png"
+    if (!extensions.contains(QFileInfo(filename).suffix().toLower())) {
+      if (extension.isEmpty() && extensions.contains("png")) {
+        extension = ".png"; // No filter selected (it happens with some native dialogs)
+      }
       filename += extension;
     }
     auto view = dynamic_cast<ImageView *>(_tabWidget->currentWidget());
@@ -171,6 +177,9 @@ void ImageDialog::onCloseClicked(bool)
 
 void ImageView::paintEvent(QPaintEvent *)
 {
+  if (_image.isNull() || (width() <= 0) || (height() <= 0)) {
+    return; // Nothing to draw (and the ratios below would be divisions by zero)
+  }
   QPainter p(this);
   QImage displayed;
   if ((static_cast<float>(_image.width()) / static_cast<float>(_image.height())) > (static_cast<float>(width()) / static_cast<float>(height()))) {
@@ -188,3 +197,5 @@ const QImage & ImageView::image() const
 }
 
 } // namespace gmic_qt_standalone
+
+

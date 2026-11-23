@@ -30,6 +30,7 @@
 #include <QIcon>
 #include <QString>
 #include <QVector>
+#include <iosfwd>
 #include "Common.h"
 class QAction;
 class QObject;
@@ -48,6 +49,13 @@ enum class TagColor
   Yellow,
   Count
 };
+
+// True for None, Red, ..., Yellow, false for TagColor::Count and for any out of range value
+// (e.g. coming from an invalid cast).
+inline bool isValidTagColor(TagColor color)
+{
+  return static_cast<unsigned int>(color) < static_cast<unsigned int>(TagColor::Count);
+}
 
 class TagAssets {
 public:
@@ -117,7 +125,7 @@ public:
 
 private:
   unsigned int _mask;
-  static const unsigned int _fullMask = ((1 << int(TagColor::Count)) - 1);
+  static const unsigned int _fullMask = ((1u << static_cast<unsigned int>(TagColor::Count)) - 1u);
 };
 
 std::ostream & operator<<(std::ostream & out, const TagColorSet & colors);
@@ -126,20 +134,29 @@ TagColorSet::TagColorSet(unsigned int mask) : _mask(mask & _fullMask) {}
 
 inline void TagColorSet::toggle(TagColor color)
 {
-  Q_ASSERT_X((color != TagColor::Count), __PRETTY_FUNCTION__, QString("Inavild color (%1)").arg(int(color)).toLocal8Bit().constData());
-  _mask ^= (1u << int(color));
+  Q_ASSERT_X(isValidTagColor(color), __PRETTY_FUNCTION__, QString("Invalid color (%1)").arg(int(color)).toLocal8Bit().constData());
+  if (!isValidTagColor(color)) { // Asserts are disabled in release mode: never corrupt the mask (or shift by too much)
+    return;
+  }
+  _mask ^= (1u << static_cast<unsigned int>(color));
 }
 
 void TagColorSet::insert(TagColor color)
 {
-  Q_ASSERT_X((color != TagColor::Count), __PRETTY_FUNCTION__, QString("Inavild color (%1)").arg(int(color)).toLocal8Bit().constData());
-  _mask |= (1u << int(color));
+  Q_ASSERT_X(isValidTagColor(color), __PRETTY_FUNCTION__, QString("Invalid color (%1)").arg(int(color)).toLocal8Bit().constData());
+  if (!isValidTagColor(color)) {
+    return;
+  }
+  _mask |= (1u << static_cast<unsigned int>(color));
 }
 
 bool TagColorSet::contains(TagColor color) const
 {
-  Q_ASSERT_X((color != TagColor::Count), __PRETTY_FUNCTION__, QString("Inavild color (%1)").arg(int(color)).toLocal8Bit().constData());
-  return _mask & (1u << int(color));
+  Q_ASSERT_X(isValidTagColor(color), __PRETTY_FUNCTION__, QString("Invalid color (%1)").arg(int(color)).toLocal8Bit().constData());
+  if (!isValidTagColor(color)) {
+    return false;
+  }
+  return (_mask & (1u << static_cast<unsigned int>(color))) != 0u;
 }
 
 bool TagColorSet::isEmpty() const
@@ -177,7 +194,9 @@ TagColorSet TagColorSet::operator+(TagColor color) const
 
 TagColorSet & TagColorSet::operator-=(TagColor color)
 {
-  _mask &= ~(1u << int(color));
+  if (isValidTagColor(color)) { // Shifting by 32 bits or more is undefined behavior
+    _mask &= ~(1u << static_cast<unsigned int>(color));
+  }
   return *this;
 }
 
@@ -217,7 +236,7 @@ unsigned int TagColorSet::mask() const
 
 TagColorSet::const_iterator::const_iterator(const TagColorSet & set) : _position(0), _set(set)
 {
-  while (!isAtEnd() && !(_set._mask & (1 << _position))) {
+  while (!isAtEnd() && !(_set._mask & (1u << _position))) {
     ++_position;
   }
 }
@@ -231,7 +250,7 @@ TagColorSet::const_iterator & TagColorSet::const_iterator::operator++()
 {
   while (!isAtEnd()) {
     ++_position;
-    if (_set._mask & (1 << _position)) {
+    if (_set._mask & (1u << _position)) {
       break;
     }
   }
@@ -241,7 +260,7 @@ TagColorSet::const_iterator & TagColorSet::const_iterator::operator++()
 TagColor TagColorSet::const_iterator::operator*() const
 {
   Q_ASSERT_X(!isAtEnd(), __PRETTY_FUNCTION__, "Should not dereference end() iterator");
-  Q_ASSERT_X((_set._mask & (1 << _position)), __PRETTY_FUNCTION__, "Current TagColor but is not set");
+  Q_ASSERT_X((_set._mask & (1u << _position)), __PRETTY_FUNCTION__, "Current TagColor but is not set");
   return TagColor(_position);
 }
 
@@ -285,3 +304,6 @@ inline TagColorSet & TagColorSet::operator=(const TagColorSet & other)
 } // namespace GmicQt
 
 #endif // GMIC_QT_TAGS_H
+
+
+

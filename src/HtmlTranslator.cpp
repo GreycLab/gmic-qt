@@ -36,7 +36,9 @@ QTextDocument HtmlTranslator::_document;
 
 QString HtmlTranslator::removeTags(QString str)
 {
-  return str.remove(QRegularExpression("<[^>]*>"));
+  // Building a regular expression is costly: it is done only once.
+  static const QRegularExpression tags("<[^>]*>");
+  return str.remove(tags);
 }
 
 // TODO : enum param force + enum param translate
@@ -51,7 +53,13 @@ QString HtmlTranslator::html2txt(const QString & str, bool force)
 
 bool HtmlTranslator::hasHtmlEntities(const QString & str)
 {
-  return str.contains(QRegularExpression("&[a-zA-Z]+;")) || str.contains(QRegularExpression("&#x?[0-9A-Fa-f]+;")) || str.contains(QRegularExpression("</?[a-zA-Z]*>|<[a-zA-Z]*/>"));
+  // Every entity or tag starts with '&' or '<': most of the strings are rejected right away.
+  if (!str.contains(QChar('&')) && !str.contains(QChar('<'))) {
+    return false;
+  }
+  // The three regular expressions were built (and scanned) at each call: a single one, built once.
+  static const QRegularExpression entitiesOrTags("&[a-zA-Z]+;|&#x?[0-9A-Fa-f]+;|</?[a-zA-Z]*>|<[a-zA-Z]*/>");
+  return str.contains(entitiesOrTags);
 }
 
 QString HtmlTranslator::fromUtf8Escapes(const QString & str)
@@ -65,3 +73,5 @@ QString HtmlTranslator::fromUtf8Escapes(const QString & str)
 }
 
 } // namespace GmicQt
+
+

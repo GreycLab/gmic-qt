@@ -54,17 +54,15 @@ private slots:
 
 private:
   Ui::SearchFieldWidget * ui;
-  bool _empty;
+  bool _empty = true;
   QIcon _clearIcon;
   QIcon _findIcon;
-  QLineEdit * _lineEdit;
-#if QT_VERSION_GTE(5, 2, 0)
-  QAction * _action;
-#else
-  QToolButton * _button;
-#endif
+  QLineEdit * _lineEdit = nullptr;
+  QAction * _action = nullptr;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_SEARCHFIELDWIDGET_H
+
+

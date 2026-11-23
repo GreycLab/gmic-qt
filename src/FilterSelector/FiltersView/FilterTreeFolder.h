@@ -32,7 +32,7 @@ namespace GmicQt
 {
 class FilterTreeFolder : public FilterTreeAbstractItem {
 public:
-  FilterTreeFolder(const QString & text);
+  explicit FilterTreeFolder(const QString & text);
   void setFaveFolderFlag(bool);
   bool isFullyUnchecked();
   bool isFaveFolder() const;
@@ -41,9 +41,11 @@ public:
   void setItemsVisibility(bool visible);
 
 private:
-  bool _isFaveFolder;
+  bool _isFaveFolder = false;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_FILTERTREEFOLDER_H
+
+

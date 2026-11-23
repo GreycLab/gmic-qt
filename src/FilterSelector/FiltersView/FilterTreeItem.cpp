@@ -34,8 +34,6 @@ namespace GmicQt
 
 FilterTreeItem::FilterTreeItem(const QString & text) : FilterTreeAbstractItem(text)
 {
-  _isWarning = false;
-  _isFave = false;
   setEditable(false);
 }
 
@@ -46,18 +44,13 @@ void FilterTreeItem::setHash(const QString & hash)
 
 void FilterTreeItem::setWarningFlag(bool flag)
 {
-  _isWarning = flag;
+  setWarning(flag);
 }
 
 void FilterTreeItem::setFaveFlag(bool flag)
 {
   _isFave = flag;
   setEditable(flag);
-}
-
-bool FilterTreeItem::isWarning() const
-{
-  return _isWarning;
 }
 
 bool FilterTreeItem::isFave() const
@@ -72,31 +65,26 @@ QString FilterTreeItem::hash() const
 
 bool FilterTreeItem::operator<(const QStandardItem & other) const
 {
-  auto otherFolder = dynamic_cast<const FilterTreeFolder *>(&other);
-  auto otherItem = dynamic_cast<const FilterTreeItem *>(&other);
+  const auto otherFolder = dynamic_cast<const FilterTreeFolder *>(&other);
+  const auto otherItem = dynamic_cast<const FilterTreeItem *>(&other);
   Q_ASSERT_X(otherFolder || otherItem, "FilterTreeItem::operator<", "Wrong item types");
-  bool otherIsWarning = (otherFolder && otherFolder->isWarning()) || (otherItem && otherItem->isWarning());
-  bool otherIsFaveFolder = otherFolder && otherFolder->isFaveFolder();
+  if (!otherFolder && !otherItem) {
+    return false; // Unknown type of item (the assertion above is not active in release mode)
+  }
+  const bool otherIsWarning = (otherFolder && otherFolder->isWarning()) || (otherItem && otherItem->isWarning());
 
   // Warnings first
-  if (_isWarning && !otherIsWarning) {
+  if (isWarning() && !otherIsWarning) {
     return true;
   }
-  if (!_isWarning && otherIsWarning) {
+  if (!isWarning() && otherIsWarning) {
     return false;
   }
-  // Then fave folder
-  if (otherIsFaveFolder) {
-    return false;
-  }
-  // Then folders
+  // Then the fave folder, then the other folders: they all come before the filters
   if (otherFolder) {
     return false;
   }
   // Other cases follow lexicographic order
-  if (otherFolder) {
-    return plainText().localeAwareCompare(otherFolder->plainText()) < 0;
-  }
   return plainText().localeAwareCompare(otherItem->plainText()) < 0;
 }
 
@@ -120,9 +108,11 @@ void FilterTreeItem::toggleTag(TagColor tagColor)
   FiltersTagMap::toggleFilterTag(_hash, tagColor);
 }
 
-const TagColorSet FilterTreeItem::tags() const
+TagColorSet FilterTreeItem::tags() const
 {
   return FiltersTagMap::filterTags(_hash);
 }
 
 } // namespace GmicQt
+
+

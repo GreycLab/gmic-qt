@@ -33,18 +33,30 @@
 namespace GmicQt
 {
 
-VisibleTagSelector::VisibleTagSelector(QWidget * parent) : QMenu(parent)
-{
-  _toolButton = nullptr;
-}
+VisibleTagSelector::VisibleTagSelector(QWidget * parent) : QMenu(parent) {}
 
 void VisibleTagSelector::setToolButton(QToolButton * button)
 {
+  if (_toolButton) {
+    _toolButton->disconnect(this); // Calling this method twice must not open the menu twice
+  }
   _toolButton = button;
-  connect(button, &QToolButton::clicked, [this]() {
+  if (!button) {
+    return;
+  }
+  // The selector is the context object: the connection ends with it (a lambda connected without
+  // a context would be called, with a dangling "this", if the button outlives the selector).
+  connect(button, &QToolButton::clicked, this, [this]() {
+    if (!_toolButton) {
+      return;
+    }
+    QPointer<VisibleTagSelector> guard(this);
     updateColors();
     exec(_toolButton->mapToGlobal(_toolButton->rect().center()));
-    emit visibleColorsChanged((unsigned int)_selectedColors.mask());
+    if (!guard) { // Destroyed while the menu was open (exec() runs a local event loop)
+      return;
+    }
+    emit visibleColorsChanged(static_cast<unsigned int>(_selectedColors.mask()));
   });
 }
 
@@ -54,11 +66,11 @@ void VisibleTagSelector::updateColors()
   clear();
   QAction * action = addAction(tr("Show All Filters"));
   action->setIcon(TagAssets::menuIcon(TagColor::None, _selectedColors.isEmpty() ? TagAssets::IconMark::Disk : TagAssets::IconMark::None));
-  connect(action, &QAction::triggered, [this]() { _selectedColors.clear(); });
+  connect(action, &QAction::triggered, this, [this]() { _selectedColors.clear(); });
   for (TagColor color : used) {
-    QAction * action = addAction(tr("Show %1 Tags").arg(TagAssets::colorName(color)));
-    action->setIcon(TagAssets::menuIcon(color, (_selectedColors.contains(color)) ? TagAssets::IconMark::Check : TagAssets::IconMark::None));
-    connect(action, &QAction::triggered, [this, color](bool) { // TODO : Check
+    QAction * colorAction = addAction(tr("Show %1 Tags").arg(TagAssets::colorName(color)));
+    colorAction->setIcon(TagAssets::menuIcon(color, (_selectedColors.contains(color)) ? TagAssets::IconMark::Check : TagAssets::IconMark::None));
+    connect(colorAction, &QAction::triggered, this, [this, color](bool) { // TODO : Check
       _selectedColors.toggle(color);
     });
   }
@@ -74,6 +86,8 @@ TagColorSet VisibleTagSelector::selectedColors() const
   return _selectedColors;
 }
 
-VisibleTagSelector::~VisibleTagSelector() {}
+VisibleTagSelector::~VisibleTagSelector() = default;
 
 } // namespace GmicQt
+
+

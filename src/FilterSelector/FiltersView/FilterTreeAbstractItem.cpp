@@ -32,18 +32,16 @@ namespace GmicQt
 
 FilterTreeAbstractItem::FilterTreeAbstractItem(QString text)
 {
-  _visibilityItem = nullptr;
   if (text.startsWith(WarningPrefix)) {
     text.remove(0, 1);
     _isWarning = true;
-  } else {
-    _isWarning = false;
   }
-  setText(FilterTextTranslator::translate(text));
-  _plainText = HtmlTranslator::html2txt(FilterTextTranslator::translate(text), true);
+  const QString translated = FilterTextTranslator::translate(text); // Translated once
+  setText(translated);
+  _plainText = HtmlTranslator::html2txt(translated, true);
 }
 
-FilterTreeAbstractItem::~FilterTreeAbstractItem() {}
+FilterTreeAbstractItem::~FilterTreeAbstractItem() = default;
 
 void FilterTreeAbstractItem::setVisibilityItem(QStandardItem * item)
 {
@@ -58,6 +56,11 @@ const QString & FilterTreeAbstractItem::plainText() const
 bool FilterTreeAbstractItem::isWarning() const
 {
   return _isWarning;
+}
+
+void FilterTreeAbstractItem::setWarning(bool flag)
+{
+  _isWarning = flag;
 }
 
 bool FilterTreeAbstractItem::isVisible() const
@@ -96,3 +99,5 @@ QString FilterTreeAbstractItem::removeWarningPrefix(QString folderName)
 }
 
 } // namespace GmicQt
+
+

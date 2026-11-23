@@ -75,7 +75,7 @@ void ConstParameter::reset()
 bool ConstParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QStringList list = parseText("value", text, textLength);
-  if (list.isEmpty()) {
+  if (list.size() < 2) { // list[1] is read below
     return false;
   }
   _name = HtmlTranslator::html2txt(FilterTextTranslator::translate(list[0], filterName));
@@ -84,3 +84,5 @@ bool ConstParameter::initFromText(const QString & filterName, const char * text,
 }
 
 } // namespace GmicQt
+
+

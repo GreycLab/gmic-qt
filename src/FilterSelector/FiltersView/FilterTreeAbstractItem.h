@@ -31,8 +31,8 @@ namespace GmicQt
 {
 class FilterTreeAbstractItem : public QStandardItem {
 public:
-  FilterTreeAbstractItem(QString text);
-  ~FilterTreeAbstractItem();
+  explicit FilterTreeAbstractItem(QString text);
+  ~FilterTreeAbstractItem() override;
   void setVisibilityItem(QStandardItem * item);
   const QString & plainText() const;
   bool isWarning() const;
@@ -42,13 +42,20 @@ public:
   static QString removeWarningPrefix(QString folderName);
 
 protected:
-  QStandardItem * _visibilityItem;
+  /**
+   * The warning flag is set from the filter name (see the constructor), or explicitly by the
+   * derived classes. It is stored here only: a second flag in a derived class would hide this one.
+   */
+  void setWarning(bool flag);
+  QStandardItem * _visibilityItem = nullptr;
 
 private:
   QString _plainText;
-  bool _isWarning;
+  bool _isWarning = false;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_FILTERTREEABSTRACTITEM_H
+
+

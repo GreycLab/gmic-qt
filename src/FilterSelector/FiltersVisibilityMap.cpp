@@ -37,6 +37,34 @@
 namespace GmicQt
 {
 
+namespace
+{
+
+// The visibility file is normally a few kilobytes long.
+const qint64 MaxVisibilityFileSize = 16ll << 20;
+const quint32 MaxUncompressedSize = 64u << 20;
+const qint32 MaxHiddenFiltersCount = 1000000;
+
+/*
+ * qUncompress() trusts the size announced in the first four bytes (big endian) of the data and
+ * allocates that much memory: refuse absurd values coming from a corrupted file.
+ */
+QByteArray safelyUncompress(const QByteArray & data)
+{
+  if (data.size() < 4) {
+    return QByteArray();
+  }
+  const uchar * p = reinterpret_cast<const uchar *>(data.constData());
+  const quint32 announcedSize = (quint32(p[0]) << 24) | (quint32(p[1]) << 16) | (quint32(p[2]) << 8) | quint32(p[3]);
+  if (announcedSize > MaxUncompressedSize) {
+    Logger::error(QString("Visibility file: announced uncompressed size is too large (%1 bytes)").arg(announcedSize));
+    return QByteArray();
+  }
+  return qUncompress(data);
+}
+
+} // namespace
+
 QSet<QString> FiltersVisibilityMap::_hiddenFilters;
 
 bool FiltersVisibilityMap::filterIsVisible(const QString & hash)
@@ -57,38 +85,53 @@ void FiltersVisibilityMap::load()
 {
   QString path = QString("%1%2").arg(gmicConfigPath(false), FILTERS_VISIBILITY_FILENAME);
   QFile file(path);
-  if (file.open(QFile::ReadOnly)) {
-    QString line;
-    do {
-      line = file.readLine();
-    } while (file.bytesAvailable() && line != QString("[Hidden filters list (compressed)]\n"));
-    QByteArray data = qUncompress(file.readAll());
-    QBuffer buffer(&data);
-    buffer.open(QIODevice::ReadOnly);
+  if (!file.open(QFile::ReadOnly)) {
+    return; // No file (yet)
+  }
+  if (file.size() > MaxVisibilityFileSize) {
+    Logger::error("Visibility file is too large (" + file.fileName() + ")");
+    return;
+  }
+  // Skip the header lines, up to the marker of the compressed data
+  const QByteArray marker("[Hidden filters list (compressed)]\n");
+  bool markerFound = false;
+  while (!file.atEnd()) {
+    if (file.readLine(1024) == marker) {
+      markerFound = true;
+      break;
+    }
+  }
+  if (!markerFound) {
+    Logger::error("Cannot read visibility file (" + file.fileName() + ")");
+    return;
+  }
+  QByteArray data = safelyUncompress(file.readAll());
+  QBuffer buffer(&data);
+  if (!buffer.open(QIODevice::ReadOnly)) {
+    return;
+  }
 
-    bool ok;
-    qint32 count = buffer.readLine().trimmed().toInt(&ok);
-    if (ok) {
-      QString hash;
-      while (count--) {
-        hash = buffer.readLine().trimmed();
-        _hiddenFilters.insert(hash);
-      }
-    } else {
-      Logger::error("Cannot read visibility file (" + file.fileName() + ")");
+  bool ok = false;
+  const qint32 count = buffer.readLine(1024).trimmed().toInt(&ok);
+  // A negative count used to be turned into a loop of about 2^32 iterations by "while (count--)".
+  if (!ok || (count < 0) || (count > MaxHiddenFiltersCount)) {
+    Logger::error("Cannot read visibility file (" + file.fileName() + ")");
+    return;
+  }
+  for (qint32 i = 0; (i < count) && !buffer.atEnd(); ++i) {
+    const QString hash = QString::fromLatin1(buffer.readLine(1024).trimmed());
+    if (!hash.isEmpty()) {
+      _hiddenFilters.insert(hash);
     }
   }
 }
 
 void FiltersVisibilityMap::save()
 {
-  QByteArray data;
-  QBuffer buffer(&data);
-  buffer.open(QIODevice::WriteOnly);
-  qint32 count = _hiddenFilters.size();
-  buffer.write(QString("%1\n").arg(count).toLatin1());
+  QByteArray data = QByteArray::number(static_cast<qint32>(_hiddenFilters.size())) + '\n';
   for (const QString & str : _hiddenFilters) {
-    buffer.write((str + QChar('\n')).toLatin1());
+    data += str.toLatin1();
+    data += '\n';
   }
   QString path = QString("%1%2").arg(gmicConfigPath(true), FILTERS_VISIBILITY_FILENAME);
   QByteArray array = QString("Version=%1\n[Hidden filters list (compressed)]\n").arg(gmicVersionString()).toLocal8Bit();
@@ -99,3 +142,5 @@ void FiltersVisibilityMap::save()
 }
 
 } // namespace GmicQt
+
+

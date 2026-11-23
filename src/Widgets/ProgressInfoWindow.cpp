@@ -30,6 +30,9 @@
 #include <QScreen>
 #include <QSettings>
 #include <QStyleFactory>
+#include <QTime>
+#include <algorithm>
+#include <cmath>
 #include "Common.h"
 #include "FilterThread.h"
 #include "Globals.h"
@@ -49,7 +52,9 @@ ProgressInfoWindow::ProgressInfoWindow(HeadlessProcessor * processor) : QMainWin
   setWindowTitle(tr("G'MIC-Qt Plug-in progression"));
   processor->setProgressWindow(this);
 
-  ui->label->setText(QString("%1").arg(processor->filterName()));
+  // The name comes from a filter definition: it must not be interpreted as rich text
+  ui->label->setTextFormat(Qt::PlainText);
+  ui->label->setText(processor->filterName());
   ui->progressBar->setRange(0, 100);
   ui->progressBar->setValue(100);
   ui->info->setText("");
@@ -119,10 +124,10 @@ void ProgressInfoWindow::onProgress(float progress, int duration, unsigned long 
   if (!_isShown) {
     return;
   }
-  if (progress >= 0) {
+  if (std::isfinite(progress) && (progress >= 0)) { // Converting NaN, or a huge value, to an int is undefined
     ui->progressBar->setInvertedAppearance(false);
     ui->progressBar->setTextVisible(true);
-    ui->progressBar->setValue((int)progress);
+    ui->progressBar->setValue(static_cast<int>(std::min(progress, 100.0f)));
   } else {
     ui->progressBar->setTextVisible(false);
     int value = ui->progressBar->value();
@@ -136,7 +141,9 @@ void ProgressInfoWindow::onProgress(float progress, int duration, unsigned long 
   }
   QString durationStr;
   if (duration >= 60000) {
-    durationStr = QTime::fromMSecsSinceStartOfDay(duration).toString("HH:mm:ss");
+    // QTime is limited to 24 hours: it returned an empty string for longer durations
+    const int totalSeconds = duration / 1000;
+    durationStr = QString("%1:%2:%3").arg(totalSeconds / 3600, 2, 10, QChar('0')).arg((totalSeconds / 60) % 60, 2, 10, QChar('0')).arg(totalSeconds % 60, 2, 10, QChar('0'));
   } else {
     durationStr = QString(tr("%1 seconds")).arg(duration / 1000);
   }
@@ -162,9 +169,11 @@ void ProgressInfoWindow::onInfo(QString text)
 void ProgressInfoWindow::onProcessingFinished(const QString & errorMessage)
 {
   if (!errorMessage.isEmpty()) {
-    QMessageBox::critical(this, "Error", errorMessage, QMessageBox::Close);
+    QMessageBox::critical(this, tr("Error"), errorMessage, QMessageBox::Close);
   }
   close();
 }
 
 } // namespace GmicQt
+
+

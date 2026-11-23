@@ -25,8 +25,10 @@
 #include "Widgets/ZoomLevelSelector.h"
 #include <QDebug>
 #include <QLineEdit>
+#include <QLocale>
 #include <QRegularExpression>
 #include <cmath>
+#include <limits>
 #include "Common.h"
 #include "Globals.h"
 #include "IconLoader.h"
@@ -35,6 +37,37 @@
 
 namespace GmicQt
 {
+
+namespace
+{
+
+// Building a regular expression is costly: it is done once.
+const QRegularExpression & percentSuffix()
+{
+  static const QRegularExpression re(" ?%?$");
+  return re;
+}
+
+/**
+ * Reads a percentage (without its "%" sign), written with the decimal point of the locale or with a '.'.
+ * (QString::toDouble() only knows the '.': it returned 0 for "66,7", which was then sent as a zoom level.)
+ */
+bool parsePercentage(const QString & text, double & value)
+{
+  const QString trimmed = text.trimmed();
+  bool ok = false;
+  double v = QLocale().toDouble(trimmed, &ok);
+  if (!ok) {
+    v = trimmed.toDouble(&ok);
+  }
+  if (!ok || !std::isfinite(v)) {
+    return false;
+  }
+  value = v;
+  return true;
+}
+
+} // namespace
 
 ZoomLevelSelector::ZoomLevelSelector(QWidget * parent) : QWidget(parent), ui(new Ui::ZoomLevelSelector)
 {
@@ -112,6 +145,9 @@ void ZoomLevelSelector::setPreviewWidget(const PreviewWidget * widget)
 
 void ZoomLevelSelector::display(const double zoom)
 {
+  if (!std::isfinite(zoom) || (zoom < 0.0)) {
+    return; // Converting such a value to an int would be undefined
+  }
   bool decimals = static_cast<int>(zoom * 10000) % 100;
   QString text;
   if (decimals && zoom < 1) {
@@ -168,12 +204,17 @@ void ZoomLevelSelector::onComboBoxEditingFinished()
     return;
   }
   if (!text.endsWith(" %")) {
-    text.remove(QRegularExpression(" ?%?$"));
+    text.remove(percentSuffix());
     text += " %";
   }
   QString digits = text;
   digits.remove(" %");
-  double value = digits.toDouble();
+  double value = 0.0;
+  if (!parsePercentage(digits, value) || !(value > 0.0)) {
+    // Not a usable zoom level: keep the previous one (0 used to be sent to the preview)
+    ui->comboBox->lineEdit()->setText(_currentText);
+    return;
+  }
   if ((_zoomConstraint == ZoomConstraint::OneOrMore) && (value < 100.0)) {
     ui->comboBox->lineEdit()->setText(_currentText = "100 %");
   } else {
@@ -196,7 +237,11 @@ double ZoomLevelSelector::currentZoomValue()
 {
   QString text = ui->comboBox->currentText();
   text.remove(" %");
-  return text.toDouble() / 100.0;
+  double value = 0.0;
+  if (!parsePercentage(text, value)) {
+    return 0.0;
+  }
+  return value / 100.0;
 }
 
 ZoomLevelValidator::ZoomLevelValidator(QObject * parent) : QValidator(parent)
@@ -208,8 +253,10 @@ ZoomLevelValidator::ZoomLevelValidator(QObject * parent) : QValidator(parent)
 QValidator::State ZoomLevelValidator::validate(QString & input, int & pos) const
 {
   QString str = input;
-  str.remove(QRegularExpression(" ?%?$"));
+  str.remove(percentSuffix());
   return _doubleValidator->validate(str, pos);
 }
 
 } // namespace GmicQt
+
+

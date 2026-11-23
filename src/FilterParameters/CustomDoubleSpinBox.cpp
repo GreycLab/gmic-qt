@@ -40,6 +40,10 @@ namespace GmicQt
 
 CustomDoubleSpinBox::CustomDoubleSpinBox(QWidget * parent, float min, float max) : QDoubleSpinBox(parent)
 {
+  if (!std::isfinite(min) || !std::isfinite(max)) { // Such a range would break the spin box
+    min = 0.0f;
+    max = 100.0f;
+  }
   setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
   const int decimals = std::max(2, MAX_DIGITS - std::max(integerPartDigitCount(min), integerPartDigitCount(max)));
   setDecimals(decimals);
@@ -52,22 +56,24 @@ CustomDoubleSpinBox::CustomDoubleSpinBox(QWidget * parent, float min, float max)
   _sizeHint = dummy->sizeHint();
   _minimumSizeHint = dummy->minimumSizeHint();
   delete dummy;
-  connect(this, &QDoubleSpinBox::editingFinished, [this]() { _unfinishedKeyboardEditing = false; });
+  connect(this, &QDoubleSpinBox::editingFinished, this, [this]() { _unfinishedKeyboardEditing = false; });
 }
 
-CustomDoubleSpinBox::~CustomDoubleSpinBox() {}
+CustomDoubleSpinBox::~CustomDoubleSpinBox() = default;
 
 QString CustomDoubleSpinBox::textFromValue(double value) const
 {
   QString text = QString::number(value, 'g', MAX_DIGITS);
   if (text.contains('e') || text.contains('E')) {
     text = QString::number(value, 'f', decimals());
-    if (text.contains(Settings::DecimalPoint)) {
+    // QString::number() always uses '.', whatever the locale is (Settings::DecimalPoint is the locale's
+    // one: with ',' the trailing zeros were never removed).
+    if (text.contains(QChar('.'))) {
       while (text.endsWith(QChar('0'))) {
         text.chop(1);
       }
-      if (text.endsWith(Settings::DecimalPoint)) {
-        text.chop(Settings::DecimalPoint.length());
+      if (text.endsWith(QChar('.'))) {
+        text.chop(1);
       }
     }
   }
@@ -100,11 +106,16 @@ void CustomDoubleSpinBox::keyPressEvent(QKeyEvent * event)
 
 int CustomDoubleSpinBox::integerPartDigitCount(float value)
 {
+  if (!std::isfinite(value)) {
+    return 0; // "nan" or "inf" are not numbers of digits
+  }
   QString text = QString::number(static_cast<double>(value), 'f', 0);
-  if (text[0] == QChar('-')) {
+  if (text.startsWith(QChar('-'))) {
     text.remove(0, 1);
   }
   return text.length();
 }
 
 } // namespace GmicQt
+
+

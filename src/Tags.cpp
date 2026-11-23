@@ -27,17 +27,30 @@
 #include <QBuffer>
 #include <QByteArray>
 #include <QDebug>
+#include <QFont>
 #include <QIcon>
 #include <QImage>
 #include <QObject>
 #include <QPainter>
+#include <QPalette>
+#include <QPen>
 #include <QPixmap>
 #include <QStringList>
+#include <algorithm>
+#include <ostream>
 #include "Common.h"
 #include "Settings.h"
 
 namespace GmicQt
 {
+
+namespace
+{
+// Tag markers are drawn with the height of a line of text: keep their size within sane bounds
+// (a null size gives an empty image, and a huge one a huge allocation).
+const unsigned int MinMarkerSideSize = 3;
+const unsigned int MaxMarkerSideSize = 512;
+} // namespace
 
 const TagColorSet TagColorSet::Full(TagColorSet::_fullMask);
 const TagColorSet TagColorSet::ActualColors(TagColorSet::_fullMask &(~1u));
@@ -53,14 +66,23 @@ QColor TagAssets::colors[static_cast<unsigned int>(TagColor::Count)] = {QColor(0
 
 const QString & TagAssets::markerHtml(const TagColor color, unsigned int height)
 {
+  static const QString invalid;
+  Q_ASSERT_X(isValidTagColor(color), __PRETTY_FUNCTION__, "Invalid color");
+  if (!isValidTagColor(color)) {
+    return invalid;
+  }
+  height = std::min(std::max(height, MinMarkerSideSize), MaxMarkerSideSize);
   if (!(height % 2)) {
     ++height;
   }
-  const int iColor = (int)color;
+  const unsigned int iColor = static_cast<unsigned int>(color);
   if (!_markerHtml[iColor].isEmpty() && _markerSideSize[iColor] == height) {
     return _markerHtml[iColor];
   }
-  QImage image(height, height, QImage::Format_RGBA8888);
+  QImage image(static_cast<int>(height), static_cast<int>(height), QImage::Format_RGBA8888);
+  if (image.isNull()) {
+    return invalid;
+  }
   image.fill(QColor(0, 0, 0, 0));
   if (color != TagColor::None) {
     QPainter painter(&image);
@@ -70,11 +92,14 @@ const QString & TagAssets::markerHtml(const TagColor color, unsigned int height)
     pen.setColor(QColor(0, 0, 0, 128));
     painter.setPen(pen);
     painter.setBrush(colors[iColor]);
-    painter.drawEllipse(1, 1, height - 2, height - 2);
+    const int diameter = static_cast<int>(height) - 2;
+    painter.drawEllipse(1, 1, diameter, diameter);
   }
   QByteArray ba;
   QBuffer buffer(&ba);
-  image.save(&buffer, "png");
+  if (!image.save(&buffer, "png")) {
+    return invalid;
+  }
   _markerSideSize[iColor] = height;
   _markerHtml[iColor] = QString("<img style=\"vertical-align: baseline\" src=\"data:image/png;base64,%1\"/>").arg(QString(ba.toBase64()));
   return _markerHtml[iColor];
@@ -82,7 +107,12 @@ const QString & TagAssets::markerHtml(const TagColor color, unsigned int height)
 
 const QIcon & TagAssets::menuIcon(TagColor color, IconMark mark)
 {
-  const int iColor = (int)color;
+  static const QIcon invalid;
+  Q_ASSERT_X(isValidTagColor(color), __PRETTY_FUNCTION__, "Invalid color");
+  if (!isValidTagColor(color)) {
+    return invalid;
+  }
+  const unsigned int iColor = static_cast<unsigned int>(color);
   if (_menuIcons[iColor].isNull()) {
     QPixmap bg(64, 64);
     QFont font;
@@ -145,7 +175,7 @@ const QIcon & TagAssets::menuIcon(TagColor color, IconMark mark)
 
 QAction * TagAssets::action(QObject * parent, TagColor color, IconMark mark)
 {
-  if ((color == TagColor::None) || (color == TagColor::Count)) {
+  if ((color == TagColor::None) || !isValidTagColor(color)) {
     return nullptr;
   }
   return new QAction(menuIcon(color, mark), QObject::tr("%1 Tag").arg(colorName(color)), parent);
@@ -153,15 +183,18 @@ QAction * TagAssets::action(QObject * parent, TagColor color, IconMark mark)
 
 QString TagAssets::colorName(TagColor color)
 {
-  Q_ASSERT_X(((unsigned int)color < (unsigned int)TagColor::Count), __PRETTY_FUNCTION__, "Invalid color");
-  static QStringList names = {QObject::tr("None"),    //
-                              QObject::tr("Red"),     //
-                              QObject::tr("Green"),   //
-                              QObject::tr("Blue"),    //
-                              QObject::tr("Cyan"),    //
-                              QObject::tr("Magenta"), //
-                              QObject::tr("Yellow")};
-  return names.at(int(color));
+  Q_ASSERT_X(isValidTagColor(color), __PRETTY_FUNCTION__, "Invalid color");
+  if (!isValidTagColor(color)) { // QStringList::at() is not bounds-checked in release mode
+    return QString();
+  }
+  static const QStringList names = {QObject::tr("None"),    //
+                                    QObject::tr("Red"),     //
+                                    QObject::tr("Green"),   //
+                                    QObject::tr("Blue"),    //
+                                    QObject::tr("Cyan"),    //
+                                    QObject::tr("Magenta"), //
+                                    QObject::tr("Yellow")};
+  return names.at(static_cast<int>(color));
 }
 
 std::ostream & operator<<(std::ostream & out, const TagColorSet & colors)

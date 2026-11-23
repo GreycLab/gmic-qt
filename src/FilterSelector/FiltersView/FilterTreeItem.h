@@ -34,11 +34,10 @@ namespace GmicQt
 {
 class FilterTreeItem : public FilterTreeAbstractItem {
 public:
-  FilterTreeItem(const QString & text);
+  explicit FilterTreeItem(const QString & text);
   void setHash(const QString & hash);
   void setWarningFlag(bool flag);
   void setFaveFlag(bool flag);
-  bool isWarning() const;
   bool isFave() const;
   QString hash() const;
   bool operator<(const QStandardItem & other) const override;
@@ -46,14 +45,15 @@ public:
   void addTag(TagColor tagColor);
   void removeTag(TagColor tagColor);
   void toggleTag(TagColor tagColor);
-  const TagColorSet tags() const;
+  TagColorSet tags() const;
 
 private:
   QString _hash;
-  bool _isFave;
-  bool _isWarning;
+  bool _isFave = false;
 };
 
 } // namespace GmicQt
 
 #endif // GMIC_QT_FILTERTREEITEM_H
+
+

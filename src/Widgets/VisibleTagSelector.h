@@ -27,6 +27,8 @@
 
 #include <QActionGroup>
 #include <QMenu>
+#include <QPointer>
+#include <QToolButton>
 #include "Tags.h"
 
 class QToolButton;
@@ -49,7 +51,7 @@ signals:
   void visibleColorsChanged(unsigned int);
 
 private:
-  QToolButton * _toolButton;
+  QPointer<QToolButton> _toolButton; // Guarded: the button is not owned by the selector
   QVector<TagColor> _colors;
   TagColorSet _selectedColors;
 };
@@ -57,3 +59,5 @@ private:
 } // namespace GmicQt
 
 #endif // GMIC_QT_VISIBLETAGSELECTOR_H
+
+

@@ -41,8 +41,9 @@ namespace GmicQt
 
 const QMap<QString, QString> & LanguageSettings::availableLanguages()
 {
-  static QMap<QString, QString> result;
-  if (result.isEmpty()) {
+  // Built once, in a thread-safe way (it used to be filled lazily after an isEmpty() test)
+  static const QMap<QString, QString> languages = []() {
+    QMap<QString, QString> result;
     result["en"] = QString("English");
     result["cs"] = QString::fromUtf8("\xc4\x8c\x65\xc5\xa1\x74\x69\x6e\x61");
     result["de"] = QString("Deutsch");
@@ -60,8 +61,9 @@ const QMap<QString, QString> & LanguageSettings::availableLanguages()
     result["uk"] = QString::fromUtf8("\xd0\xa3\xd0\xba\xd1\x80\xd0\xb0\xd1\x97\xd0\xbd\xd1\x81\xd1\x8c\xd0\xba\xd0\xb0");
     result["zh"] = QString::fromUtf8("\xe7\xae\x80\xe5\x8c\x96\xe5\xad\x97");
     result["zh_tw"] = QString::fromUtf8("\xe6\xad\xa3\xe9\xab\x94\xe5\xad\x97\x2f\xe7\xb9\x81\xe9\xab\x94\xe5\xad\x97");
-  }
-  return result;
+    return result;
+  }();
+  return languages;
 }
 
 QString LanguageSettings::configuredTranslator()
@@ -73,8 +75,7 @@ QString LanguageSettings::configuredTranslator()
       code = "en";
     }
   } else {
-    QMap<QString, QString> map = availableLanguages();
-    if (map.find(code) == map.end()) {
+    if (!availableLanguages().contains(code)) {
       code = "en";
     }
   }
@@ -86,12 +87,11 @@ QString LanguageSettings::systemDefaultAndAvailableLanguageCode()
   QList<QString> languages = QLocale().uiLanguages();
   if (!languages.isEmpty()) {
     QString lang = languages.front().split("-").front();
-    QMap<QString, QString> map = availableLanguages();
     // Check for traditional Chinese (following https://stackoverflow.com/a/4894634)
     if ((lang == "zh") && (languages.front().endsWith("TW") || languages.front().endsWith("HK"))) {
       return QString("zh_tw");
     }
-    if (map.find(lang) != map.end()) {
+    if (availableLanguages().contains(lang)) {
       return lang;
     }
   }
@@ -148,3 +148,5 @@ void LanguageSettings::installQtTranslator(const QString & lang)
 }
 
 } // namespace GmicQt
+
+

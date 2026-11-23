@@ -27,9 +27,11 @@
 #include <QDebug>
 #include <QRegularExpression>
 #include <QString>
+#include <algorithm>
 #include <limits>
 #include "Globals.h"
 #include "HtmlTranslator.h"
+#include "Logger.h"
 #include "Misc.h"
 
 namespace GmicQt
@@ -91,14 +93,24 @@ FavesModel::const_iterator FavesModel::findFaveFromPlainText(const QString & nam
 
 const FavesModel::Fave & FavesModel::getFaveFromHash(const QString & hash) const
 {
-  Q_ASSERT_X(_faves.contains(hash), "getFaveFromHash", "Hash not found");
-  return _faves.find(hash).value();
+  const auto it = _faves.constFind(hash);
+  Q_ASSERT_X(it != _faves.cend(), "getFaveFromHash", "Hash not found");
+  if (it == _faves.cend()) {
+    // Calling value() on the end iterator would be undefined (the assertion is not active in release mode)
+    Logger::error(QString("FavesModel::getFaveFromHash(): hash not found (%1)").arg(hash));
+    static const Fave EmptyFave;
+    return EmptyFave;
+  }
+  return it.value();
 }
 
-QString FavesModel::uniqueName(const QString & name, const QString & faveHashToIgnore)
+QString FavesModel::uniqueName(const QString & name, const QString & faveHashToIgnore) const
 {
+  // Building a regular expression is costly: they are built once, not once per fave.
+  static const QRegularExpression numberedSuffix(R"~( *\(\d+\)$)~");
+  static const QRegularExpression numberedSuffixWithCapture(R"~( *\((\d+)\)$)~");
   QString basename(name);
-  basename.remove(QRegularExpression(R"~( *\(\d+\)$)~"));
+  basename.remove(numberedSuffix);
   int iMax = -1;
   bool nameIsUnique = true;
   QMap<QString, Fave>::const_iterator it = _faves.cbegin();
@@ -108,10 +120,9 @@ QString FavesModel::uniqueName(const QString & name, const QString & faveHashToI
       if (faveName == name) {
         nameIsUnique = false;
       }
-      QRegularExpression re(R"~( *\((\d+)\)$)~");
-      QRegularExpressionMatch match = re.match(faveName);
+      const QRegularExpressionMatch match = numberedSuffixWithCapture.match(faveName);
       if (match.hasMatch()) {
-        faveName.remove(re);
+        faveName.remove(numberedSuffixWithCapture);
         if (faveName == basename) {
           iMax = std::max(iMax, match.captured(1).toInt());
         }
@@ -172,6 +183,9 @@ FavesModel::Fave & FavesModel::Fave::setDefaultVisibilities(const QList<int> & d
 
 FavesModel::Fave & FavesModel::Fave::build()
 {
+  // NOTE: toLocal8Bit() makes the hashes depend on the system locale, and two different names that cannot be
+  // encoded in it end up with the same hash. Switching to toUtf8() would change the hashes of existing faves
+  // (and the keys of their stored parameters): it needs a migration, so it is left as is.
   QCryptographicHash hash(QCryptographicHash::Md5);
   hash.addData("FAVE/");
   hash.addData(_name.toLocal8Bit());
@@ -198,7 +212,7 @@ const QString & FavesModel::Fave::plainText() const
   return _plainText;
 }
 
-const QString FavesModel::Fave::absolutePath() const
+QString FavesModel::Fave::absolutePath() const
 {
   static const QList<QString> FavePath = {HtmlTranslator::removeTags(FAVE_FOLDER_TEXT)};
   return filterFullPathWithoutTags(FavePath, _name);
@@ -243,11 +257,7 @@ QString FavesModel::Fave::toString() const
 {
   return QString("(name='%1', command='%2', previewCommand='%3',"
                  " hash='%4', originalHash='%5')")
-      .arg(_name)
-      .arg(_command)
-      .arg(_previewCommand)
-      .arg(_hash)
-      .arg(_originalHash);
+      .arg(_name, _command, _previewCommand, _hash, _originalHash); // Multi-argument form: arguments are not rescanned
 }
 
 bool FavesModel::Fave::matchKeywords(const QList<QString> & keywords) const
@@ -264,10 +274,7 @@ bool FavesModel::Fave::matchKeywords(const QList<QString> & keywords) const
   return true;
 }
 
-FavesModel::const_iterator::const_iterator(const QMap<QString, FavesModel::Fave>::const_iterator & iterator)
-{
-  _mapIterator = iterator;
-}
+FavesModel::const_iterator::const_iterator(const QMap<QString, FavesModel::Fave>::const_iterator & iterator) : _mapIterator(iterator) {}
 
 const FavesModel::Fave & FavesModel::const_iterator::operator*() const
 {
@@ -303,3 +310,5 @@ bool FavesModel::const_iterator::operator==(const FavesModel::const_iterator & o
 }
 
 } // namespace GmicQt
+
+

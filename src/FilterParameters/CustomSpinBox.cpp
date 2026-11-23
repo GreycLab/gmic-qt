@@ -49,10 +49,10 @@ CustomSpinBox::CustomSpinBox(QWidget * parent, int min, int max) : QSpinBox(pare
   _sizeHint = dummy->sizeHint();
   _minimumSizeHint = dummy->minimumSizeHint();
   delete dummy;
-  connect(this, &QSpinBox::editingFinished, [this]() { _unfinishedKeyboardEditing = false; });
+  connect(this, &QSpinBox::editingFinished, this, [this]() { _unfinishedKeyboardEditing = false; });
 }
 
-CustomSpinBox::~CustomSpinBox() {}
+CustomSpinBox::~CustomSpinBox() = default;
 
 QString CustomSpinBox::textFromValue(int value) const
 {
@@ -84,11 +84,16 @@ void CustomSpinBox::keyPressEvent(QKeyEvent * event)
 
 int CustomSpinBox::integerPartDigitCount(float value)
 {
+  if (!std::isfinite(value)) {
+    return 0; // "nan" or "inf" are not numbers of digits
+  }
   QString text = QString::number(static_cast<double>(value), 'f', 0);
-  if (text[0] == QChar('-')) {
+  if (text.startsWith(QChar('-'))) {
     text.remove(0, 1);
   }
   return text.length();
 }
 
 } // namespace GmicQt
+
+
