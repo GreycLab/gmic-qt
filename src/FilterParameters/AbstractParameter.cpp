@@ -224,6 +224,7 @@ void AbstractParameter::hideWidgets()
   if (!_grid || (_row == -1)) {
     return;
   }
+  _visibilityApplied = false;
   for (int col = 0; col < 5; ++col) {
     QLayoutItem * item = _grid->itemAtPosition(_row, col);
     QWidget * widget = item ? item->widget() : nullptr; // An item may be a spacer or a layout
@@ -237,6 +238,9 @@ void AbstractParameter::setVisibilityState(AbstractParameter::VisibilityState st
 {
   if (state == VisibilityState::Unspecified) {
     setVisibilityState(defaultVisibilityState());
+    return;
+  }
+  if (_visibilityApplied && (state == _visibilityState)) {
     return;
   }
   _visibilityState = state;
@@ -370,5 +374,3 @@ void AbstractParameter::notifyIfRelevant()
 }
 
 } // namespace GmicQt
-
-

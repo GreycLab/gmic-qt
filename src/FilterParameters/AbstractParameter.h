@@ -92,6 +92,7 @@ protected:
   VisibilityState _defaultVisibilityState;
   QGridLayout * _grid;
   int _row;
+  bool _visibilityApplied = false;
 #ifdef _GMIC_QT_DEBUG_
   QString _debugName;
 #endif

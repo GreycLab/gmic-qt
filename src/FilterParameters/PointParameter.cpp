@@ -192,18 +192,18 @@ void PointParameter::extractPositionFromKeypointList(KeypointList & list)
   if (list.isEmpty()) {
     return; // front() would be undefined
   }
-  enableNotifications(false);
-  KeypointList::Keypoint kp = list.front();
+  const KeypointList::Keypoint & kp = list.front();
   if (!kp.isNaN()) {
     _position.setX(kp.x);
     _position.setY(kp.y);
     if (_spinBoxX && _spinBoxY) {
+      disconnectSpinboxes();
       _spinBoxX->setValue(kp.x);
       _spinBoxY->setValue(kp.y);
+      connectSpinboxes();
     }
   }
   list.pop_front();
-  enableNotifications(true);
 }
 
 QString PointParameter::value() const
@@ -226,6 +226,9 @@ void PointParameter::setValue(const QString & value)
     Logger::warning(QString("PointParameter::setValue(\"%1\"): bad value (parameter \"%2\")").arg(value, _name));
     return;
   }
+  const QPointF previousPosition = _position;
+  const bool previousRemoved = _removed;
+
   float x = 0.0f;
   float y = 0.0f;
   bool xNaN = false;
@@ -240,13 +243,17 @@ void PointParameter::setValue(const QString & value)
   }
   _removed = (_removable && xNaN && yNaN);
 
-  updateView();
+  if ((_position != previousPosition) || (_removed != previousRemoved)) {
+    updateView();
+  }
 }
 
 void PointParameter::setVisibilityState(AbstractParameter::VisibilityState state)
 {
-  AbstractParameter::setVisibilityState(state);
-  if (state == VisibilityState::Visible) {
+  const VisibilityState resolved = (state == VisibilityState::Unspecified) ? defaultVisibilityState() : state;
+  const bool changed = !_visibilityApplied || (resolved != visibilityState());
+  AbstractParameter::setVisibilityState(resolved);
+  if (changed && (resolved == VisibilityState::Visible)) {
     updateView();
   }
 }
@@ -552,5 +559,3 @@ void PointParameter::pickColorFromDefaultColormap()
 }
 
 } // namespace GmicQt
-
-
