@@ -319,6 +319,17 @@ QString flattenGmicParameterList(const QList<QString> & list, const QVector<bool
   return result;
 }
 
+QStringList resolveUnchangedStatusValues(const QStringList & status, const QStringList & currentValues)
+{
+  QStringList result = status;
+  for (int i = 0; i < result.size(); ++i) {
+    if (result[i].isNull()) {
+      result[i] = (i < currentValues.size()) ? currentValues[i] : QString("");
+    }
+  }
+  return result;
+}
+
 QString mergedWithSpace(const QString & prefix, const QString & suffix)
 {
   if (prefix.isEmpty() || suffix.isEmpty()) {

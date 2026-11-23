@@ -56,6 +56,10 @@ QString filterFullPathBasename(const QString & path);
 
 QString flattenGmicParameterList(const QList<QString> & list, const QVector<bool> & quotedParameters);
 
+// Replaces the null items of a gmic status string list ("{}" items, meaning "value unchanged")
+// with the corresponding items of 'currentValues'.
+QStringList resolveUnchangedStatusValues(const QStringList & status, const QStringList & currentValues);
+
 QStringList expandParameterList(const QStringList & parameters, const QVector<int> & sizes);
 
 QString elided(const QString & text, int width);

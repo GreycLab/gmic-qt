@@ -80,6 +80,7 @@ private:
   QString _errorMessage;
   QString _hash;
   QVector<bool> _gmicStatusQuotedParameters;
+  QStringList _filterParameters;
 };
 
 } // namespace GmicQt

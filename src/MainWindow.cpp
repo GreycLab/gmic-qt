@@ -797,7 +797,7 @@ void MainWindow::onPreviewKeypointsEvent(unsigned int flags, unsigned long time)
 
 void MainWindow::onPreviewImageAvailable()
 {
-  ui->filterParams->setValues(_processor.gmicStatus(), false);
+  ui->filterParams->setValues(_processor.gmicStatus(), false, true);
   ui->filterParams->setVisibilityStates(_processor.parametersVisibilityStates());
   // Make sure keypoint positions are synchronized with gmic status
   if (ui->filterParams->hasKeypoints()) {
@@ -810,7 +810,7 @@ void MainWindow::onPreviewImageAvailable()
 
 void MainWindow::onGUIDynamismRunDone()
 {
-  ui->filterParams->setValues(_processor.gmicStatus(), false);
+  ui->filterParams->setValues(_processor.gmicStatus(), false, true);
   ui->filterParams->setVisibilityStates(_processor.parametersVisibilityStates());
   if (ui->filterParams->hasKeypoints()) {
     ui->previewWidget->setKeypoints(ui->filterParams->keypoints());
@@ -869,6 +869,7 @@ void MainWindow::processImage()
   context.randomized = false;
   ui->filterParams->updateValueString(false); // Required to get up-to-date values of text parameters
   context.filterArguments = ui->filterParams->valueString();
+  context.filterParameters = ui->filterParams->valueStringList();
   context.previewFromFullImage = false;
   _processor.setGmicStatusQuotedParameters(ui->filterParams->quotedParameters());
   ui->filterParams->clearButtonParameters();
@@ -935,7 +936,7 @@ void MainWindow::onFullImageProcessingDone()
   enableWidgetList(true);
   ui->pbCancel->setEnabled(false);
   ui->previewWidget->update();
-  ui->filterParams->setValues(_processor.gmicStatus(), false);
+  ui->filterParams->setValues(_processor.gmicStatus(), false, true);
   ui->filterParams->setVisibilityStates(_processor.parametersVisibilityStates());
   if ((_pendingActionAfterCurrentProcessing == ProcessingAction::Ok || _pendingActionAfterCurrentProcessing == ProcessingAction::Close)) {
     _isAccepted = (_pendingActionAfterCurrentProcessing == ProcessingAction::Ok);

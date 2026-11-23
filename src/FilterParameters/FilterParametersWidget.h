@@ -49,7 +49,7 @@ public:
   ~FilterParametersWidget() override;
   const QString & valueString() const;
   QStringList valueStringList() const;
-  void setValues(const QStringList &, bool notify);
+  void setValues(const QStringList &, bool notify, bool nullMeansUnchanged = false);
   void setVisibilityStates(QList<int> states);
   QList<int> visibilityStates();
   QList<int> defaultVisibilityStates();

@@ -90,6 +90,7 @@ public:
     QString filterCommand;
     QString filterFullPath;
     QString filterArguments;
+    QStringList filterParameters; // Parameter values at request time (used to resolve "unchanged" status items)
     QString filterHash;
   };
 

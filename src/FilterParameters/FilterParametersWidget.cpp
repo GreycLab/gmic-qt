@@ -316,7 +316,7 @@ QStringList FilterParametersWidget::valueStringList() const
   return list;
 }
 
-void FilterParametersWidget::setValues(const QStringList & list, bool notify)
+void FilterParametersWidget::setValues(const QStringList & list, bool notify, bool nullMeansUnchanged)
 {
   if (list.isEmpty()) {
     return;
@@ -328,7 +328,10 @@ void FilterParametersWidget::setValues(const QStringList & list, bool notify)
   auto itValue = list.begin();
   for (AbstractParameter * param : _parameters) {
     if (param->isActualParameter()) {
-      param->setValue(*itValue++);
+      if (!(nullMeansUnchanged && itValue->isNull())) {
+        param->setValue(*itValue);
+      }
+      ++itValue;
     }
   }
   updateValueString(notify);

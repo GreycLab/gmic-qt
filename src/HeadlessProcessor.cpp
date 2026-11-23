@@ -77,6 +77,7 @@ bool HeadlessProcessor::setPluginParameters(const RunParameters & parameters)
   _command.clear();
   _arguments.clear();
   _gmicStatusQuotedParameters.clear();
+  _filterParameters.clear();
   _path = QString::fromStdString(parameters.filterPath);
   _inputMode = (parameters.inputMode == InputMode::Unspecified) ? DefaultInputMode : parameters.inputMode;
   _outputMode = (parameters.outputMode == OutputMode::Unspecified) ? DefaultOutputMode : parameters.outputMode;
@@ -112,6 +113,7 @@ bool HeadlessProcessor::setPluginParameters(const RunParameters & parameters)
           _command = filter.command;
           _arguments = flattenGmicParameterList(defaultParameters, quoted);
           _gmicStatusQuotedParameters = quoted;
+          _filterParameters = defaultParameters;
         } else {
           QString command;
           QString arguments;
@@ -136,6 +138,7 @@ bool HeadlessProcessor::setPluginParameters(const RunParameters & parameters)
               } else {
                 _arguments = flattenGmicParameterList(merged, quoted);
                 _gmicStatusQuotedParameters = quoted;
+                _filterParameters = merged;
               }
             }
           }
@@ -249,6 +252,7 @@ void HeadlessProcessor::onProcessingFinished()
     QSettings settings;
     const QString keyPrefix = QString("LastExecution/host_%1/").arg(GmicQtHost::ApplicationShortname);
     if (!status.isEmpty() && !_hash.isEmpty()) {
+      status = resolveUnchangedStatusValues(status, _filterParameters);
       ParametersCache::setValues(_hash, status);
       ParametersCache::save();
       QString statusString = flattenGmicParameterList(status, _gmicStatusQuotedParameters);

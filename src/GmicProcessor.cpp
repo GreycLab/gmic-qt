@@ -519,7 +519,7 @@ void GmicProcessor::onApplyThreadFinished()
       CroppedActiveLayerProxy::clear();
       CroppedImageListProxy::clear();
       releaseFilterThread();
-      _lastAppliedCommandGmicStatus = _gmicStatus; // TODO : save visibility states?
+      _lastAppliedCommandGmicStatus = resolveUnchangedStatusValues(_gmicStatus, _filterContext.filterParameters); // TODO : save visibility states?
       emit fullImageProcessingDone();
     }
   }

@@ -155,7 +155,10 @@ QStringList FilterThread::status2StringList(const QString & status)
   const gmic_list<char> clist = status2Items(ba.constData(), false);
   QStringList qlist;
   for (unsigned int l = 0; l < clist.size(); ++l) {
-    qlist << QString::fromLocal8Bit(clist[l].data());
+    const char * item = clist[l].data();
+    // Empty item "{}": no value provided, the parameter must keep its current value.
+    // It is represented by a null QString.
+    qlist << ((item && *item) ? QString::fromLocal8Bit(item) : QString());
   }
   return qlist;
 }
