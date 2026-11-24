@@ -945,8 +945,7 @@ void PreviewWidget::mouseReleaseEvent(QMouseEvent * e)
       KeypointList::Keypoint & kp = _keypoints[_movedKeypointIndex];
       kp.setPosition(p);
       _movedKeypointIndex = -1;
-      const unsigned char flags = KeypointMouseReleaseEvent | (kp.burst ? KeypointBurstEvent : 0);
-      emit keypointPositionsChanged(flags, e->timestamp());
+      emit keypointPositionsChanged(KeypointMouseReleaseEvent, e->timestamp());
     }
     e->accept();
     return;
@@ -1023,14 +1022,15 @@ void PreviewWidget::mouseMoveEvent(QMouseEvent * e)
       KeypointList::Keypoint & kp = _keypoints[_movedKeypointIndex];
       kp.setPosition(p);
       update();
-      if (kp.burst) {
-        unsigned char flags = 0;
-        if (e->timestamp() - _keypointTimestamp > 15) {
-          flags |= KeypointBurstEvent;
-          _keypointTimestamp = e->timestamp();
-        }
-        emit keypointPositionsChanged(flags, e->timestamp());
+      // Always notify the new position. KeypointBurstEvent only tells that this motion event is a candidate
+      // for a refresh of the preview (at most one every 15 ms): MainWindow decides whether it is actually
+      // used, depending on the measured latency of the filter.
+      unsigned char flags = 0;
+      if (e->timestamp() - _keypointTimestamp > 15) {
+        flags |= KeypointBurstEvent;
+        _keypointTimestamp = e->timestamp();
       }
+      emit keypointPositionsChanged(flags, e->timestamp());
     }
     e->accept();
   } else if (e->buttons() & Qt::RightButton) {

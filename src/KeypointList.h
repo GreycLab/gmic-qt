@@ -44,13 +44,12 @@ public:
     float y;
     QColor color; /* A negative alpha means "Keep opacity while moved" */
     bool removable;
-    bool burst;
     float radius; /* A negative value is a percentage of the preview diagonal */
     bool keepOpacityWhenSelected;
 
-    Keypoint(float x, float y, const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
-    Keypoint(const QPointF & point, const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
-    Keypoint(const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected);
+    Keypoint(float x, float y, const QColor & color, bool removable, float radius, bool keepOpacityWhenSelected);
+    Keypoint(const QPointF & point, const QColor & color, bool removable, float radius, bool keepOpacityWhenSelected);
+    Keypoint(const QColor & color, bool removable, float radius, bool keepOpacityWhenSelected);
     bool isNaN() const;
     Keypoint & setNaN();
     inline void setPosition(float newX, float newY);

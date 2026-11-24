@@ -117,6 +117,7 @@ public:
 
   int duration() const;
   float progress() const;
+  bool hasPreviewFilterExecutionDurations() const;
   int lastPreviewFilterExecutionDurationMS() const;
   void resetLastPreviewFilterExecutionDurations();
   void recordPreviewFilterExecutionDurationMS(int duration);

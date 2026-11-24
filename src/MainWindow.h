@@ -133,6 +133,8 @@ private slots:
 
 private:
   void onVeryFirstShowEvent();
+  bool keypointLiveRefreshIsAffordable();
+  void resetKeypointLiveRefreshState();
   void setZoomConstraint();
   bool filtersSelectionMode();
   void clearMessage();
@@ -176,6 +178,11 @@ private:
   FiltersPresenter * _filtersPresenter;
   GmicProcessor _processor;
   ulong _lastPreviewKeypointBurstUpdateTime;
+  // Automatic management of the live refresh of the preview while a keypoint is dragged
+  bool _keypointLiveMode = false;         // Live refresh currently considered as affordable for the current filter
+  bool _keypointLiveSuspended = false;    // Live refresh given up until the mouse button is released
+  bool _keypointLiveUpdatesDone = false;  // At least one live refresh has been done during the current drag
+  int _keypointLiveCostMS = -1;           // Smoothed latency (ms) of the live refreshes, -1 if not measured yet
   static bool _isAccepted;
   RunParameters _pluginParameters;
   VisibleTagSelector * _visibleTagSelector;

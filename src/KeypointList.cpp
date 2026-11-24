@@ -99,19 +99,19 @@ bool KeypointList::isRemovable(int n) const
   return _keypoints[static_cast<size_type>(n)].removable;
 }
 
-KeypointList::Keypoint::Keypoint(float x, float y, const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected)
-    : x(x), y(y), color(color), removable(removable), burst(burst), radius(radius), keepOpacityWhenSelected(keepOpacityWhenSelected)
+KeypointList::Keypoint::Keypoint(float x, float y, const QColor & color, bool removable, float radius, bool keepOpacityWhenSelected)
+    : x(x), y(y), color(color), removable(removable), radius(radius), keepOpacityWhenSelected(keepOpacityWhenSelected)
 {
 }
 
-KeypointList::Keypoint::Keypoint(const QPointF & point, const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected)
-    : x(static_cast<float>(point.x())), y(static_cast<float>(point.y())), color(color), removable(removable), burst(burst), radius(radius),
+KeypointList::Keypoint::Keypoint(const QPointF & point, const QColor & color, bool removable, float radius, bool keepOpacityWhenSelected)
+    : x(static_cast<float>(point.x())), y(static_cast<float>(point.y())), color(color), removable(removable), radius(radius),
       keepOpacityWhenSelected(keepOpacityWhenSelected)
 {
 }
 
-KeypointList::Keypoint::Keypoint(const QColor & color, bool removable, bool burst, float radius, bool keepOpacityWhenSelected)
-    : x(std::numeric_limits<float>::quiet_NaN()), y(std::numeric_limits<float>::quiet_NaN()), color(color), removable(removable), burst(burst), radius(radius),
+KeypointList::Keypoint::Keypoint(const QColor & color, bool removable, float radius, bool keepOpacityWhenSelected)
+    : x(std::numeric_limits<float>::quiet_NaN()), y(std::numeric_limits<float>::quiet_NaN()), color(color), removable(removable), radius(radius),
       keepOpacityWhenSelected(keepOpacityWhenSelected)
 {
 }

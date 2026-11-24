@@ -269,6 +269,11 @@ float GmicProcessor::progress() const
   return 0.0f;
 }
 
+bool GmicProcessor::hasPreviewFilterExecutionDurations() const
+{
+  return !_lastFilterPreviewExecutionDurations.empty();
+}
+
 int GmicProcessor::lastPreviewFilterExecutionDurationMS() const
 {
   if (_lastFilterPreviewExecutionDurations.empty()) {

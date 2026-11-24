@@ -81,7 +81,7 @@ public:
 
   enum KeypointMotionFlags
   {
-    KeypointBurstEvent = 1,
+    KeypointBurstEvent = 1, // Motion event candidate for a live refresh of the preview
     KeypointMouseReleaseEvent = 2
   };
 

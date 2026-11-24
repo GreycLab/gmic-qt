@@ -83,7 +83,6 @@ private:
   QPointF _position = QPointF(0, 0);
   QColor _color;
   bool _removable = false;
-  bool _burst = false;
   float _radius = 0.0f;
   bool _keepOpacityWhenSelected = false;
 

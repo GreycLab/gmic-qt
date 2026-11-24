@@ -29,6 +29,7 @@
 #include <QCloseEvent>
 #include <QCursor>
 #include <QDebug>
+#include <QElapsedTimer>
 #include <QEvent>
 #include <QGuiApplication>
 #include <QKeySequence>
@@ -766,11 +767,62 @@ void MainWindow::onPreviewUpdateRequested(bool synchronous, bool randomized)
   _okButtonShouldApply = true;
 }
 
+void MainWindow::resetKeypointLiveRefreshState()
+{
+  _lastPreviewKeypointBurstUpdateTime = 0;
+  _keypointLiveMode = false;
+  _keypointLiveSuspended = false;
+  _keypointLiveUpdatesDone = false;
+  _keypointLiveCostMS = -1;
+}
+
+/*
+ * Tells whether the preview can be refreshed while a keypoint is being dragged, i.e. whether the filter is
+ * fast enough for the interaction to remain fluid (the refresh is synchronous, so it blocks the GUI).
+ *
+ * The decision is based on the measured latency of the filter, with some hysteresis to avoid flickering
+ * around the thresholds:
+ *  - The base estimate is the latency of the last preview executions (the worse of the last one and
+ *    the average one). Without any measure, live refreshes are not started.
+ *  - Live refreshes start if the estimate is not greater than KEYPOINTS_INTERACTIVE_MIDDLE_DELAY_MS.
+ *  - Once started, the smoothed latency of the live refreshes themselves is also taken into account.
+ *    They are given up (until the mouse button is released) if the estimate gets greater than
+ *    KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS.
+ * The measures are updated each time a preview is computed, so the choice is revised at each drag.
+ */
+bool MainWindow::keypointLiveRefreshIsAffordable()
+{
+  if (_keypointLiveSuspended || !ui->cbPreview->isChecked()) {
+    return false;
+  }
+  int estimate = -1; // Unknown
+  if (_processor.hasPreviewFilterExecutionDurations()) {
+    estimate = std::max(_processor.lastPreviewFilterExecutionDurationMS(), _processor.averagePreviewFilterExecutionDuration());
+  }
+  if (_keypointLiveMode) {
+    estimate = std::max(estimate, _keypointLiveCostMS);
+  }
+  if (estimate < 0) {
+    return false;
+  }
+  if (_keypointLiveMode) {
+    if (estimate > KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS) {
+      _keypointLiveMode = false;
+      _keypointLiveSuspended = true;
+    }
+  } else if (estimate <= KEYPOINTS_INTERACTIVE_MIDDLE_DELAY_MS) {
+    _keypointLiveMode = true;
+    _keypointLiveCostMS = -1; // Forget a possible old measure, it will be measured again
+  }
+  return _keypointLiveMode;
+}
+
 void MainWindow::onPreviewKeypointsEvent(unsigned int flags, unsigned long time)
 {
   if (flags & PreviewWidget::KeypointMouseReleaseEvent) {
-    if (flags & PreviewWidget::KeypointBurstEvent) {
-      // Notify the filter twice (synchronously) so that it can guess that the button has been released
+    if (_keypointLiveUpdatesDone && _keypointLiveMode) {
+      // The preview has been refreshed during the drag: notify the filter twice (synchronously) so that it can
+      // guess that the button has been released
       ui->filterParams->setKeypoints(ui->previewWidget->keypoints(), false);
       onPreviewUpdateRequested(true);
       onPreviewUpdateRequested(true);
@@ -778,18 +830,21 @@ void MainWindow::onPreviewKeypointsEvent(unsigned int flags, unsigned long time)
       ui->filterParams->setKeypoints(ui->previewWidget->keypoints(), true);
     }
     _lastPreviewKeypointBurstUpdateTime = 0;
+    _keypointLiveUpdatesDone = false;
+    _keypointLiveSuspended = false;
   } else {
     ui->filterParams->setKeypoints(ui->previewWidget->keypoints(), false);
-    if (flags & PreviewWidget::KeypointBurstEvent) {
-      // Durations are ints: make sure a negative value is never converted to a huge unsigned one
-      const auto lastDuration = static_cast<ulong>(std::max(0, _processor.lastPreviewFilterExecutionDurationMS()));
-      const auto averageDuration = static_cast<ulong>(std::max(0, _processor.averagePreviewFilterExecutionDuration()));
-      const bool keypointBurstEnabled = (lastDuration <= KEYPOINTS_INTERACTIVE_LOWER_DELAY_MS) || ((lastDuration <= KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS) && (averageDuration <= KEYPOINTS_INTERACTIVE_MIDDLE_DELAY_MS));
-      const ulong minInterval = keypointBurstEnabled ? lastDuration : std::max<ulong>(2 * lastDuration, KEYPOINTS_INTERACTIVE_UPPER_DELAY_MS);
+    if ((flags & PreviewWidget::KeypointBurstEvent) && keypointLiveRefreshIsAffordable()) {
+      const ulong minInterval = static_cast<ulong>(std::max(0, _keypointLiveCostMS));
       // The event time may go backwards (clock reset/wrap): do not let the unsigned subtraction wrap around by accident
       const ulong msSinceLastBurstEvent = (time >= _lastPreviewKeypointBurstUpdateTime) ? (time - _lastPreviewKeypointBurstUpdateTime) : std::numeric_limits<ulong>::max();
       if (msSinceLastBurstEvent >= minInterval) {
+        QElapsedTimer timer;
+        timer.start();
         onPreviewUpdateRequested(true);
+        const int elapsed = static_cast<int>(std::min<qint64>(timer.elapsed(), std::numeric_limits<int>::max()));
+        _keypointLiveCostMS = (_keypointLiveCostMS < 0) ? elapsed : ((_keypointLiveCostMS + elapsed) / 2);
+        _keypointLiveUpdatesDone = true;
         _lastPreviewKeypointBurstUpdateTime = time;
       }
     }
@@ -1267,6 +1322,7 @@ void MainWindow::activateFilter(bool resetZoom, const QList<QString> & values)
   saveCurrentParameters();
   const FiltersPresenter::Filter & filter = _filtersPresenter->currentFilter();
   _processor.resetLastPreviewFilterExecutionDurations();
+  resetKeypointLiveRefreshState();
   if (filter.hash.isEmpty()) {
     setNoFilter();
     return;

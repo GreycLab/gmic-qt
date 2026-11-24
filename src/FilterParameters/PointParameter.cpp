@@ -168,10 +168,6 @@ bool PointParameter::addTo(QWidget * widget, int row)
   setTextSelectable(label);
   _grid->addWidget(rowCell, row, 1, 1, 2);
 
-#ifdef _GMIC_QT_DEBUG_
-  label->setToolTip(QString("Burst: %1").arg(_burst ? "on" : "off"));
-#endif
-
   setRemoved(_removed);
   connectSpinboxes();
   return true;
@@ -180,9 +176,9 @@ bool PointParameter::addTo(QWidget * widget, int row)
 void PointParameter::addToKeypointList(KeypointList & list) const
 {
   if (_removable && _removed) {
-    list.add(KeypointList::Keypoint(_color, _removable, _burst, _radius, _keepOpacityWhenSelected));
+    list.add(KeypointList::Keypoint(_color, _removable, _radius, _keepOpacityWhenSelected));
   } else {
-    list.add(KeypointList::Keypoint(_position.x(), _position.y(), _color, _removable, _burst, _radius, _keepOpacityWhenSelected));
+    list.add(KeypointList::Keypoint(_position.x(), _position.y(), _color, _removable, _radius, _keepOpacityWhenSelected));
   }
 }
 
@@ -302,7 +298,11 @@ void PointParameter::randomize()
   }
 }
 
-// P = point(x,y,removable{(0),1},burst{(0),1},r,g,b,a{negative->keepOpacityWhenSelected},radius,widget_visible{0|(1)})
+// P = point(x,y,removable{(0),1},burst{ignored},r,g,b,a{negative->keepOpacityWhenSelected},radius,widget_visible{0|(1)})
+//
+// The 4th parameter (burst) is still parsed, for compatibility with existing filters, but its value is ignored:
+// the plug-in decides by itself when the preview can be refreshed while a point is being dragged
+// (see MainWindow::onPreviewKeypointsEvent()).
 bool PointParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("point", text, textLength);
@@ -314,7 +314,6 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
 
   bool ok = true;
   _color.setRgb(255, 255, 255, 255);
-  _burst = false;
   _removable = false;
   _radius = KeypointList::Keypoint::DefaultRadius;
   _keepOpacityWhenSelected = false;
@@ -369,11 +368,10 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
   }
 
   if (params.size() >= 4) {
-    const int burst = params[3].toInt(&ok);
+    params[3].toInt(&ok); // Ignored value: only checked for syntax
     if (!ok) {
       return false;
     }
-    _burst = (burst != 0);
   }
 
   if (params.size() >= 5) {
