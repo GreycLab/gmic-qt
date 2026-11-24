@@ -298,11 +298,10 @@ void PointParameter::randomize()
   }
 }
 
-// P = point(x,y,removable{(0),1},burst{ignored},r,g,b,a{negative->keepOpacityWhenSelected},radius,widget_visible{0|(1)})
+// P = point(x,y,removable{(0),1},r,g,b,a{negative->keepOpacityWhenSelected},radius,widget_visible{0|(1)})
 //
-// The 4th parameter (burst) is still parsed, for compatibility with existing filters, but its value is ignored:
-// the plug-in decides by itself when the preview can be refreshed while a point is being dragged
-// (see MainWindow::onPreviewKeypointsEvent()).
+// There is no "burst" parameter: the plug-in decides by itself when the preview can be refreshed
+// while a point is being dragged (see MainWindow::onPreviewKeypointsEvent()).
 bool PointParameter::initFromText(const QString & filterName, const char * text, int & textLength)
 {
   QList<QString> list = parseText("point", text, textLength);
@@ -368,14 +367,7 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
   }
 
   if (params.size() >= 4) {
-    params[3].toInt(&ok); // Ignored value: only checked for syntax
-    if (!ok) {
-      return false;
-    }
-  }
-
-  if (params.size() >= 5) {
-    const int red = params[4].toInt(&ok);
+    const int red = params[3].toInt(&ok);
     if (!ok) {
       return false;
     }
@@ -387,8 +379,8 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
     pickColorFromDefaultColormap();
   }
 
-  if (params.size() >= 6) {
-    const int green = params[5].toInt(&ok);
+  if (params.size() >= 5) {
+    const int green = params[4].toInt(&ok);
     if (!ok) {
       return false;
     }
@@ -396,20 +388,20 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
     _color.setBlue(0);
   }
 
-  if (params.size() >= 7) {
-    const int blue = params[6].toInt(&ok);
+  if (params.size() >= 6) {
+    const int blue = params[5].toInt(&ok);
     if (!ok) {
       return false;
     }
     _color.setBlue(clampedChannel(blue));
   }
 
-  if (params.size() >= 8) {
-    const int alpha = params[7].toInt(&ok);
+  if (params.size() >= 7) {
+    const int alpha = params[6].toInt(&ok);
     if (!ok) {
       return false;
     }
-    if (params[7].trimmed().startsWith("-") || (alpha < 0)) {
+    if (params[6].trimmed().startsWith("-") || (alpha < 0)) {
       _keepOpacityWhenSelected = true;
     }
     // Computed on a wider type: std::abs(INT_MIN) is undefined
@@ -417,8 +409,8 @@ bool PointParameter::initFromText(const QString & filterName, const char * text,
     _color.setAlpha(static_cast<int>(std::min(magnitude, 255ll)));
   }
 
-  if (params.size() >= 9) {
-    QString s = params[8].trimmed();
+  if (params.size() >= 8) {
+    QString s = params[7].trimmed();
     const bool isPercentage = s.endsWith("%");
     if (isPercentage) {
       s.chop(1);
