@@ -137,6 +137,11 @@ void Updater::startUpdate(int ageLimit, int timeout, bool useNetwork)
           QUrl url(str);
           QNetworkRequest request(url);
           request.setHeader(QNetworkRequest::UserAgentHeader, pluginFullName());
+#if QT_VERSION >= QT_VERSION_CHECK(5, 9, 0)
+          // Qt 5 does not follow redirections by default (Qt 6 does): a redirected source ended up as
+          // an "empty file" error. Redirections from https to http are still refused by this policy.
+          request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+#endif
           // PRIVACY NOTICE (to be displayed in one of the "About" filters of the plugin
           //
           // PRIVACY NOTICE

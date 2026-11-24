@@ -337,28 +337,6 @@ void GmicProcessor::detachAllUnfinishedAbortedThreads()
   _unfinishedAbortedThreads.clear();
 }
 
-void GmicProcessor::terminateAllThreads()
-{
-  // QThread::terminate() is a last resort (resources held by the thread are not released).
-  if (_filterThread) {
-    FilterThread * thread = _filterThread;
-    _filterThread = nullptr; // Do not keep a dangling pointer
-    thread->disconnect(this);
-    thread->terminate();
-    thread->wait();
-    delete thread;
-  }
-  while (!_unfinishedAbortedThreads.isEmpty()) {
-    FilterThread * thread = _unfinishedAbortedThreads.takeFirst();
-    thread->disconnect(this);
-    thread->terminate();
-    thread->wait();
-    delete thread;
-  }
-  _waitingCursorTimer.stop();
-  OverrideCursor::setNormal();
-}
-
 bool GmicProcessor::hasUnfinishedAbortedThreads() const
 {
   return !_unfinishedAbortedThreads.isEmpty();
@@ -589,7 +567,8 @@ void GmicProcessor::updateImageNames(gmic_list<char> & imageNames)
     }
     const int newXPos = clampedToInt(static_cast<double>(xPos) * xFactor);
     const int newYPos = clampedToInt(static_cast<double>(yPos) * yFactor);
-    str.replace(match.captured(0), QString("pos(%1%2%3)").arg(newXPos).arg(match.captured(2)).arg(newYPos));
+    // Replace the matched range only (replacing the matched text would also alter any other identical occurrence)
+    str.replace(match.capturedStart(0), match.capturedLength(0), QString("pos(%1%2%3)").arg(newXPos).arg(match.captured(2)).arg(newYPos));
     const QByteArray utf8 = str.toUtf8(); // Image names are UTF-8 encoded (see QString::fromUtf8() above)
     name.assign(static_cast<unsigned int>(utf8.size()) + 1);
     std::memcpy(name.data(), utf8.constData(), static_cast<size_t>(utf8.size()) + 1); // Includes the terminating null character
@@ -634,6 +613,15 @@ void GmicProcessor::manageSynchonousRunner(FilterSyncRunner & runner)
   _gmicImages->assign();
   runner.swapImages(*_gmicImages);
   PersistentMemory::move_from(runner.persistentMemoryOutput());
+  // Same check as in onPreviewThreadFinished(): otherwise the extra channels were silently dropped here
+  unsigned int badSpectrumIndex = 0;
+  if (!checkImageSpectrumAtMost4(*_gmicImages, badSpectrumIndex)) {
+    const int spectrum = (*_gmicImages)[badSpectrumIndex].spectrum();
+    hideWaitingCursor();
+    const QString message(tr("Image #%1 returned by filter has %2 channels (should be at most 4)"));
+    emit previewCommandFailed(message.arg(badSpectrumIndex).arg(spectrum));
+    return;
+  }
   for (unsigned int i = 0; i < _gmicImages->size(); ++i) {
     GmicQtHost::applyColorProfile((*_gmicImages)[i]);
   }

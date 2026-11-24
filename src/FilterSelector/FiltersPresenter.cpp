@@ -23,6 +23,8 @@
  *
  */
 #include "FilterSelector/FiltersPresenter.h"
+#include <QByteArray>
+#include <QCryptographicHash>
 #include <QDebug>
 #include <QSettings>
 #include <QString>
@@ -38,15 +40,41 @@
 #include "Globals.h"
 #include "GmicStdlib.h"
 #include "HtmlTranslator.h"
+#include "LanguageSettings.h"
 #include "Logger.h"
 #include "ParametersCache.h"
 #include "PersistentMemory.h"
+#include "Settings.h"
 #include "Utils.h"
 #include "Widgets/InOutPanel.h"
 #include "Widgets/SearchFieldWidget.h"
 
 namespace GmicQt
 {
+
+namespace
+{
+/*
+ * Key of the binary cache of the filters. It is not only the hash of the filter sources: the cached
+ * data also depends on the language (names and folders are read from the "#@gui_<lang>" entries,
+ * see FiltersModelReader::parseFiltersDefinitions()) and on the filter translation, which gives the
+ * "translated" texts used by the search. Without this, changing the language left the previous
+ * language in the cache until the sources changed.
+ * The last item is the version of the layout of the cached data (to be incremented on any change
+ * of what is stored in the cache, or of the way it is computed).
+ */
+QByteArray filtersCacheKey()
+{
+  QCryptographicHash hash(QCryptographicHash::Sha1);
+  hash.addData(GmicStdLib::hash());
+  QByteArray context("|language:");
+  context.append(LanguageSettings::configuredTranslator().toUtf8());
+  context.append(Settings::filterTranslationEnabled() ? "|filters-translated" : "|filters-not-translated");
+  context.append("|cache-layout:1");
+  hash.addData(context);
+  return hash.result();
+}
+} // namespace
 
 FiltersPresenter::FiltersPresenter(QObject * parent) : QObject(parent)
 {
@@ -130,13 +158,14 @@ void FiltersPresenter::clear()
   _filtersModel.clear();
 }
 
-void FiltersPresenter::readFilters()
+void FiltersPresenter::readFilters(bool updateCache)
 {
   _filtersModel.clear();
 
+  const QByteArray cacheKey = filtersCacheKey();
   QString cacheFilename = QString("%1%2").arg(gmicConfigPath(true), FILTERS_CACHE_FILENAME);
   bool readFromCacheIsOK = false;
-  if (GmicStdLib::hash() == FiltersModelBinaryReader::readHash(cacheFilename)) {
+  if (cacheKey == FiltersModelBinaryReader::readHash(cacheFilename)) {
     readFromCacheIsOK = FiltersModelBinaryReader(_filtersModel).read(cacheFilename);
   } else {
     FilterGuiDynamismCache::clear();
@@ -145,9 +174,10 @@ void FiltersPresenter::readFilters()
   if (!readFromCacheIsOK) {
     FiltersModelReader filterModelReader(_filtersModel);
     filterModelReader.parseFiltersDefinitions(GmicStdLib::Array);
-    // Write cache
-    FiltersModelBinaryWriter writer(_filtersModel);
-    writer.write(cacheFilename, GmicStdLib::hash());
+    if (updateCache) {
+      FiltersModelBinaryWriter writer(_filtersModel);
+      writer.write(cacheFilename, cacheKey);
+    }
   }
 }
 
@@ -482,7 +512,7 @@ FiltersPresenter::Filter FiltersPresenter::findFilterFromAbsolutePathOrNameInStd
 {
   FiltersPresenter presenter(nullptr);
   presenter.readFaves();
-  presenter.readFilters();
+  presenter.readFilters(false); // Headless: do not touch the cache (no translator is installed)
   if (path.startsWith("/")) {
     presenter.selectFilterFromAbsolutePath(path);
   } else {
@@ -495,7 +525,7 @@ FiltersPresenter::Filter FiltersPresenter::findFilterFromCommandInStdlib(const Q
 {
   FiltersPresenter presenter(nullptr);
   // presenter.readFaves();
-  presenter.readFilters();
+  presenter.readFilters(false); // Headless: do not touch the cache (no translator is installed)
   presenter.selectFilterFromCommand(command);
   return presenter.currentFilter();
 }

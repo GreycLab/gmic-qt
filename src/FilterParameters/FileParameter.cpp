@@ -59,8 +59,8 @@ FileParameter::FileParameter(QObject * parent) : AbstractParameter(parent), _lab
 
 FileParameter::~FileParameter()
 {
-  delete _label;
-  delete _button;
+  delete _label.data();
+  delete _button.data();
 }
 
 int FileParameter::size() const
@@ -76,8 +76,8 @@ bool FileParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _label;
-  delete _button;
+  delete _label.data();
+  delete _button.data();
   _label = nullptr;
   _button = nullptr;
 
@@ -85,10 +85,10 @@ bool FileParameter::addTo(QWidget * widget, int row)
   _button = new QPushButton(buttonText, widget);
   _button->setIcon(IconLoader::load("document-open"));
   _label = new QLabel(_name, widget);
-  _grid->addWidget(_label, row, 0, 1, 1);
-  setTextSelectable(_label);
-  _grid->addWidget(_button, row, 1, 1, 2);
-  connect(_button, &QPushButton::clicked, this, &FileParameter::onButtonPressed);
+  _grid->addWidget(_label.data(), row, 0, 1, 1);
+  setTextSelectable(_label.data());
+  _grid->addWidget(_button.data(), row, 1, 1, 2);
+  connect(_button.data(), &QPushButton::clicked, this, &FileParameter::onButtonPressed);
   return true;
 }
 

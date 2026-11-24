@@ -25,6 +25,7 @@
 
 #include "Utils.h"
 #include <QByteArray>
+#include <QDateTime>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -182,10 +183,16 @@ const QString & pluginCodeName()
 bool touchFile(const QString & path)
 {
   QFile file(path);
+  // ReadWrite creates the file if it does not exist, and does not truncate an existing one
   if (!file.open(QFile::ReadWrite)) {
     return false;
   }
-  const auto size = file.size();
+  // Only the modification time is changed: the content of the file is never touched
+  if (file.setFileTime(QDateTime::currentDateTime(), QFileDevice::FileModificationTime)) {
+    return true;
+  }
+  // Fallback for file systems which cannot set the time: grow then shrink the file, which updates it
+  const qint64 size = file.size();
   return file.resize(size + 1) && file.resize(size);
 }
 

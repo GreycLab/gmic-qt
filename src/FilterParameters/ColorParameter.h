@@ -25,6 +25,9 @@
 #ifndef GMIC_QT_COLORPARAMETER_H
 #define GMIC_QT_COLORPARAMETER_H
 
+#include <QLabel>
+#include <QPointer>
+#include <QPushButton>
 #include <QColor>
 #include <QColorDialog>
 #include <QPixmap>
@@ -60,8 +63,8 @@ private:
   QColor _default;
   QColor _value;
   bool _alphaChannel;
-  QLabel * _label;
-  QPushButton * _button;
+  QPointer<QLabel> _label; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<QPushButton> _button; // Becomes null if the widget is destroyed with its parent widget
   QPixmap _pixmap;
   QColorDialog * _dialog;
   int _size;

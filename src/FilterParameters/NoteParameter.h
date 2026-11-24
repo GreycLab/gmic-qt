@@ -25,6 +25,8 @@
 #ifndef GMIC_QT_NOTEPARAMETER_H
 #define GMIC_QT_NOTEPARAMETER_H
 
+#include <QLabel>
+#include <QPointer>
 #include "AbstractParameter.h"
 class QLabel;
 
@@ -47,7 +49,7 @@ public slots:
   void onLinkActivated(const QString & link);
 
 private:
-  QLabel * _label;
+  QPointer<QLabel> _label; // Becomes null if the widget is destroyed with its parent widget
   QString _text;
 };
 

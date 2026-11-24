@@ -79,8 +79,8 @@ ColorParameter::ColorParameter(QObject * parent) //
 
 ColorParameter::~ColorParameter()
 {
-  delete _button;
-  delete _label;
+  delete _button.data();
+  delete _label.data();
   delete _dialog;
 }
 
@@ -97,8 +97,8 @@ bool ColorParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _button;
-  delete _label;
+  delete _button.data();
+  delete _label.data();
   _button = nullptr;
   _label = nullptr;
 
@@ -117,10 +117,10 @@ bool ColorParameter::addTo(QWidget * widget, int row)
   updateButtonColor();
 
   _label = new QLabel(_name, widget);
-  _grid->addWidget(_label, row, 0, 1, 1);
-  setTextSelectable(_label);
-  _grid->addWidget(_button, row, 1, 1, 1);
-  connect(_button, &QPushButton::clicked, this, &ColorParameter::onButtonPressed);
+  _grid->addWidget(_label.data(), row, 0, 1, 1);
+  setTextSelectable(_label.data());
+  _grid->addWidget(_button.data(), row, 1, 1, 1);
+  connect(_button.data(), &QPushButton::clicked, this, &ColorParameter::onButtonPressed);
   return true;
 }
 

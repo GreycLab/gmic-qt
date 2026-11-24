@@ -25,8 +25,13 @@
 #ifndef GMIC_QT_TEXTPARAMETER_H
 #define GMIC_QT_TEXTPARAMETER_H
 
+#include <QAction>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPointer>
 #include <QString>
 #include "AbstractParameter.h"
+#include "FilterParameters/MultilineTextParameterWidget.h"
 class QLineEdit;
 class QLabel;
 class QTextEdit;
@@ -61,10 +66,10 @@ private:
   QString _name;
   QString _default;
   QString _value;
-  QLabel * _label;
-  QLineEdit * _lineEdit;
-  MultilineTextParameterWidget * _textEdit;
-  QAction * _updateAction;
+  QPointer<QLabel> _label; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<QLineEdit> _lineEdit; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<MultilineTextParameterWidget> _textEdit; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<QAction> _updateAction; // Becomes null if the widget is destroyed with its parent widget
   bool _multiline;
   bool _connected;
 };

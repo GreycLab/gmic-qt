@@ -65,7 +65,7 @@ NoteParameter::NoteParameter(QObject * parent) : AbstractParameter(parent), _lab
 
 NoteParameter::~NoteParameter()
 {
-  delete _label;
+  delete _label.data();
 }
 
 int NoteParameter::size() const
@@ -81,16 +81,16 @@ bool NoteParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _label;
+  delete _label.data();
   _label = nullptr;
   _label = new QLabel(_text, widget);
   _label->setTextFormat(Qt::RichText);
   _label->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
   _label->setWordWrap(true);
   _label->setOpenExternalLinks(false); // Links are handled (and checked) by onLinkActivated()
-  setTextSelectable(_label);
-  connect(_label, &QLabel::linkActivated, this, &NoteParameter::onLinkActivated);
-  _grid->addWidget(_label, row, 0, 1, 3);
+  setTextSelectable(_label.data());
+  connect(_label.data(), &QLabel::linkActivated, this, &NoteParameter::onLinkActivated);
+  _grid->addWidget(_label.data(), row, 0, 1, 3);
   return true;
 }
 

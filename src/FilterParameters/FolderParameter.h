@@ -25,6 +25,9 @@
 #ifndef GMIC_QT_FOLDERPARAMETER_H
 #define GMIC_QT_FOLDERPARAMETER_H
 
+#include <QLabel>
+#include <QPointer>
+#include <QPushButton>
 #include <QString>
 #include "AbstractParameter.h"
 class QPushButton;
@@ -53,8 +56,8 @@ private:
   QString _name;
   QString _default;
   QString _value;
-  QLabel * _label;
-  QPushButton * _button;
+  QPointer<QLabel> _label; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<QPushButton> _button; // Becomes null if the widget is destroyed with its parent widget
 };
 
 } // namespace GmicQt

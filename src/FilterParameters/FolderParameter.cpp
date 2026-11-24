@@ -46,8 +46,8 @@ FolderParameter::FolderParameter(QObject * parent) : AbstractParameter(parent), 
 
 FolderParameter::~FolderParameter()
 {
-  delete _label;
-  delete _button;
+  delete _label.data();
+  delete _button.data();
 }
 
 int FolderParameter::size() const
@@ -63,19 +63,19 @@ bool FolderParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _label;
-  delete _button;
+  delete _label.data();
+  delete _button.data();
   _label = nullptr;
   _button = nullptr;
 
   _button = new QPushButton(widget);
   _button->setIcon(IconLoader::load("folder"));
   _label = new QLabel(_name, widget);
-  _grid->addWidget(_label, row, 0, 1, 1);
-  setTextSelectable(_label);
-  _grid->addWidget(_button, row, 1, 1, 2);
+  _grid->addWidget(_label.data(), row, 0, 1, 1);
+  setTextSelectable(_label.data());
+  _grid->addWidget(_button.data(), row, 1, 1, 2);
   setValue(_value);
-  connect(_button, &QPushButton::clicked, this, &FolderParameter::onButtonPressed);
+  connect(_button.data(), &QPushButton::clicked, this, &FolderParameter::onButtonPressed);
   return true;
 }
 

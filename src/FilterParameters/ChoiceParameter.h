@@ -25,6 +25,9 @@
 #ifndef GMIC_QT_CHOICEPARAMETER_H
 #define GMIC_QT_CHOICEPARAMETER_H
 
+#include <QComboBox>
+#include <QLabel>
+#include <QPointer>
 #include <QList>
 #include <QString>
 #include "AbstractParameter.h"
@@ -56,8 +59,8 @@ private:
   QString _name;
   int _default;
   int _value;
-  QLabel * _label;
-  QComboBox * _comboBox;
+  QPointer<QLabel> _label; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<QComboBox> _comboBox; // Becomes null if the widget is destroyed with its parent widget
   QList<QString> _choices;
   bool _connected;
 };

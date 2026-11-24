@@ -25,8 +25,12 @@
 #ifndef GMIC_QT_INTPARAMETER_H
 #define GMIC_QT_INTPARAMETER_H
 
+#include <QLabel>
+#include <QPointer>
+#include <QSlider>
 #include <QString>
 #include "AbstractParameter.h"
+#include "CustomSpinBox.h"
 class QSlider;
 class QLabel;
 
@@ -63,9 +67,9 @@ private:
   int _max;
   int _default;
   int _value;
-  QLabel * _label;
-  QSlider * _slider;
-  CustomSpinBox * _spinBox;
+  QPointer<QLabel> _label; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<QSlider> _slider; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<CustomSpinBox> _spinBox; // Becomes null if the widget is destroyed with its parent widget
   int _timerId;
   static const int UPDATE_DELAY = 300;
   bool _connected;

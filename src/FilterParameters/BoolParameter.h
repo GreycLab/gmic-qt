@@ -25,6 +25,9 @@
 #ifndef GMIC_QT_BOOLPARAMETER_H
 #define GMIC_QT_BOOLPARAMETER_H
 
+#include <QCheckBox>
+#include <QLabel>
+#include <QPointer>
 #include <QString>
 #include "AbstractParameter.h"
 class QCheckBox;
@@ -55,8 +58,8 @@ private:
   QString _name;
   bool _default;
   bool _value;
-  QCheckBox * _checkBox;
-  QLabel * _label;
+  QPointer<QCheckBox> _checkBox; // Becomes null if the widget is destroyed with its parent widget
+  QPointer<QLabel> _label; // Becomes null if the widget is destroyed with its parent widget
   bool _connected;
 };
 

@@ -50,9 +50,9 @@ IntParameter::IntParameter(QObject * parent) : AbstractParameter(parent), _min(0
 
 IntParameter::~IntParameter()
 {
-  delete _spinBox;
-  delete _slider;
-  delete _label;
+  delete _spinBox.data();
+  delete _slider.data();
+  delete _label.data();
 }
 
 int IntParameter::size() const
@@ -72,9 +72,9 @@ bool IntParameter::addTo(QWidget * widget, int row)
     killTimer(_timerId);
     _timerId = 0;
   }
-  delete _spinBox;
-  delete _slider;
-  delete _label;
+  delete _spinBox.data();
+  delete _slider.data();
+  delete _label.data();
   _spinBox = nullptr;
   _slider = nullptr;
   _label = nullptr;
@@ -105,12 +105,12 @@ bool IntParameter::addTo(QWidget * widget, int row)
     _slider->setPalette(p);
   }
   _label = new QLabel(_name, widget);
-  _grid->addWidget(_label, row, 0, 1, 1);
-  setTextSelectable(_label);
-  _grid->addWidget(_slider, row, 1, 1, 1);
-  _grid->addWidget(_spinBox, row, 2, 1, 1);
+  _grid->addWidget(_label.data(), row, 0, 1, 1);
+  setTextSelectable(_label.data());
+  _grid->addWidget(_slider.data(), row, 1, 1, 1);
+  _grid->addWidget(_spinBox.data(), row, 2, 1, 1);
   connectSliderSpinBox();
-  connect(_spinBox, &CustomSpinBox::editingFinished, this, [this]() { notifyIfRelevant(); });
+  connect(_spinBox.data(), &CustomSpinBox::editingFinished, this, [this]() { notifyIfRelevant(); });
 
   return true;
 }
@@ -257,9 +257,9 @@ void IntParameter::connectSliderSpinBox()
   if (_connected || !_slider || !_spinBox) {
     return;
   }
-  connect(_slider, &QSlider::sliderMoved, this, &IntParameter::onSliderMoved);
-  connect(_slider, &QSlider::valueChanged, this, &IntParameter::onSliderValueChanged);
-  connect(_spinBox, QOverload<int>::of(&CustomSpinBox::valueChanged), this, &IntParameter::onSpinBoxChanged);
+  connect(_slider.data(), &QSlider::sliderMoved, this, &IntParameter::onSliderMoved);
+  connect(_slider.data(), &QSlider::valueChanged, this, &IntParameter::onSliderValueChanged);
+  connect(_spinBox.data(), QOverload<int>::of(&CustomSpinBox::valueChanged), this, &IntParameter::onSpinBoxChanged);
   _connected = true;
 }
 

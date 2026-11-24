@@ -50,9 +50,9 @@ TextParameter::TextParameter(QObject * parent) : AbstractParameter(parent), _lab
 
 TextParameter::~TextParameter()
 {
-  delete _lineEdit;
-  delete _textEdit;
-  delete _label;
+  delete _lineEdit.data();
+  delete _textEdit.data();
+  delete _label.data();
 }
 
 int TextParameter::size() const
@@ -68,9 +68,9 @@ bool TextParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _label;
-  delete _lineEdit; // Also deletes the "update" action, which is a child of the line edit
-  delete _textEdit;
+  delete _label.data();
+  delete _lineEdit.data(); // Also deletes the "update" action, which is a child of the line edit
+  delete _textEdit.data();
   _label = nullptr;
   _lineEdit = nullptr;
   _textEdit = nullptr;
@@ -78,13 +78,13 @@ bool TextParameter::addTo(QWidget * widget, int row)
   _connected = false;      // The previous connections died with the previous widgets
   if (_multiline) {
     _textEdit = new MultilineTextParameterWidget(_name, _value, widget);
-    _grid->addWidget(_textEdit, row, 0, 1, 3);
+    _grid->addWidget(_textEdit.data(), row, 0, 1, 3);
   } else {
     _label = new QLabel(_name, widget);
-    _grid->addWidget(_label, row, 0, 1, 1);
-    setTextSelectable(_label);
+    _grid->addWidget(_label.data(), row, 0, 1, 1);
+    setTextSelectable(_label.data());
     _lineEdit = new QLineEdit(_value, widget);
-    _grid->addWidget(_lineEdit, row, 1, 1, 2);
+    _grid->addWidget(_lineEdit.data(), row, 1, 1, 2);
 #if QT_VERSION_GTE(5, 2, 0)
     _updateAction = _lineEdit->addAction(IconLoader::load("view-refresh"), QLineEdit::TrailingPosition);
 #endif
@@ -194,12 +194,12 @@ void TextParameter::connectEditor()
     return;
   }
   if (_textEdit) {
-    connect(_textEdit, &MultilineTextParameterWidget::valueChanged, this, &TextParameter::onValueChanged);
+    connect(_textEdit.data(), &MultilineTextParameterWidget::valueChanged, this, &TextParameter::onValueChanged);
   } else if (_lineEdit) {
-    connect(_lineEdit, &QLineEdit::editingFinished, this, &TextParameter::onValueChanged);
+    connect(_lineEdit.data(), &QLineEdit::editingFinished, this, &TextParameter::onValueChanged);
 #if QT_VERSION_GTE(5, 2, 0)
     if (_updateAction) {
-      connect(_updateAction, &QAction::triggered, this, &TextParameter::onValueChanged);
+      connect(_updateAction.data(), &QAction::triggered, this, &TextParameter::onValueChanged);
     }
 #endif
   } else {

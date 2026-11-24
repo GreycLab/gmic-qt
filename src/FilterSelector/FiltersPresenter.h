@@ -75,7 +75,12 @@ public:
   void rebuildFilterViewWithSelection(const QList<QString> & keywords);
 
   void clear();
-  void readFilters();
+  /**
+   * Reads the filters (from the binary cache when it is valid, otherwise from the sources).
+   * @param updateCache When false, a cache which is missing or outdated is not rewritten (used by the
+   *        headless mode, where no translator is installed: it would write untranslated search texts).
+   */
+  void readFilters(bool updateCache = true);
   void readFaves();
 
   bool allFavesAreValid() const;

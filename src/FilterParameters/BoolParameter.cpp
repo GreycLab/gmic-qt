@@ -45,8 +45,8 @@ BoolParameter::BoolParameter(QObject * parent) //
 
 BoolParameter::~BoolParameter()
 {
-  delete _checkBox;
-  delete _label;
+  delete _checkBox.data();
+  delete _label.data();
 }
 
 int BoolParameter::size() const
@@ -62,8 +62,8 @@ bool BoolParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _checkBox;
-  delete _label;
+  delete _checkBox.data();
+  delete _label.data();
   _checkBox = nullptr;
   _label = nullptr;
   // The new check box is not connected yet. Without this, a second call to addTo() left
@@ -79,8 +79,8 @@ bool BoolParameter::addTo(QWidget * widget, int row)
     p.setColor(QPalette::Base, Settings::CheckBoxBaseColor);
     _checkBox->setPalette(p);
   }
-  _grid->addWidget(_label, row, 0, 1, 1);
-  _grid->addWidget(_checkBox, row, 1, 1, 2);
+  _grid->addWidget(_label.data(), row, 0, 1, 1);
+  _grid->addWidget(_checkBox.data(), row, 1, 1, 2);
   connectCheckBox();
   return true;
 }
@@ -131,7 +131,7 @@ void BoolParameter::connectCheckBox()
   if (_connected || !_checkBox) {
     return;
   }
-  connect(_checkBox, &QCheckBox::toggled, this, &BoolParameter::onCheckBoxChanged);
+  connect(_checkBox.data(), &QCheckBox::toggled, this, &BoolParameter::onCheckBoxChanged);
   _connected = true;
 }
 

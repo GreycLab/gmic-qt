@@ -59,8 +59,8 @@ ChoiceParameter::ChoiceParameter(QObject * parent) : AbstractParameter(parent), 
 
 ChoiceParameter::~ChoiceParameter()
 {
-  delete _comboBox;
-  delete _label;
+  delete _comboBox.data();
+  delete _label.data();
 }
 
 int ChoiceParameter::size() const
@@ -76,8 +76,8 @@ bool ChoiceParameter::addTo(QWidget * widget, int row)
     return false;
   }
   _row = row;
-  delete _comboBox;
-  delete _label;
+  delete _comboBox.data();
+  delete _label.data();
   _comboBox = nullptr;
   _label = nullptr;
   // The new combo box is not connected yet. Without this, a second call to addTo() left
@@ -90,9 +90,9 @@ bool ChoiceParameter::addTo(QWidget * widget, int row)
   _comboBox->setCurrentIndex(_value);
 
   _label = new QLabel(_name, widget);
-  _grid->addWidget(_label, row, 0, 1, 1);
-  setTextSelectable(_label);
-  _grid->addWidget(_comboBox, row, 1, 1, 2);
+  _grid->addWidget(_label.data(), row, 0, 1, 1);
+  setTextSelectable(_label.data());
+  _grid->addWidget(_comboBox.data(), row, 1, 1, 2);
   connectComboBox();
   return true;
 }
@@ -196,7 +196,7 @@ void ChoiceParameter::connectComboBox()
   if (_connected || !_comboBox) {
     return;
   }
-  connect(_comboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChoiceParameter::onComboBoxIndexChanged);
+  connect(_comboBox.data(), QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ChoiceParameter::onComboBoxIndexChanged);
   _connected = true;
 }
 
