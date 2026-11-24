@@ -23,7 +23,10 @@
  *
  */
 #include "FilterSelector/FiltersModelBinaryWriter.h"
+#include <QByteArray>
 #include <QDataStream>
+#include <QIODevice>
+#include <QList>
 #include <QMap>
 #include <QString>
 #include <limits>
