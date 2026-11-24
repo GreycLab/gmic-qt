@@ -46,6 +46,7 @@ public:
   QString value() const override;
   QString defaultValue() const override;
   void setValue(const QString & value) override;
+  void setValueFromGmicStatus(const QString & value) override;
   void reset() override;
   void randomize() override;
   bool initFromText(const QString & filterName, const char * text, int & textLength) override;

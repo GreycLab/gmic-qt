@@ -124,6 +124,12 @@ void TextParameter::setValue(const QString & value)
   }
 }
 
+void TextParameter::setValueFromGmicStatus(const QString & value)
+{
+  // Same interpretation as in initFromText(): escape sequences (\n, \t, \\, \", ...) are decoded
+  setValue(unescaped(value));
+}
+
 void TextParameter::reset()
 {
   _value = _default;

@@ -316,7 +316,7 @@ QStringList FilterParametersWidget::valueStringList() const
   return list;
 }
 
-void FilterParametersWidget::setValues(const QStringList & list, bool notify, bool nullMeansUnchanged)
+void FilterParametersWidget::setValues(const QStringList & list, bool notify, bool fromGmicStatus)
 {
   if (list.isEmpty()) {
     return;
@@ -328,8 +328,12 @@ void FilterParametersWidget::setValues(const QStringList & list, bool notify, bo
   auto itValue = list.begin();
   for (AbstractParameter * param : _parameters) {
     if (param->isActualParameter()) {
-      if (!(nullMeansUnchanged && itValue->isNull())) {
-        param->setValue(*itValue);
+      if (!(fromGmicStatus && itValue->isNull())) {
+        if (fromGmicStatus) {
+          param->setValueFromGmicStatus(*itValue);
+        } else {
+          param->setValue(*itValue);
+        }
       }
       ++itValue;
     }
@@ -578,5 +582,3 @@ const QVector<bool> & FilterParametersWidget::quotedParameters() const
 }
 
 } // namespace GmicQt
-
-

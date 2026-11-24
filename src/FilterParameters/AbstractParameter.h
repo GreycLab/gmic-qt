@@ -47,6 +47,7 @@ public:
   virtual QString defaultValue() const = 0;
   virtual bool isQuoted() const;
   virtual void setValue(const QString & value) = 0;
+  virtual void setValueFromGmicStatus(const QString & value) { setValue(value); }
   virtual void clear();
   virtual void reset() = 0;
   virtual void randomize();
