@@ -25,6 +25,7 @@
 #include "FilterThread.h"
 #include <QDebug>
 #include <QRegularExpression>
+#include <algorithm>
 #include <cstring>
 #include <exception>
 #include <iostream>
@@ -203,7 +204,8 @@ bool FilterThread::aborted() const
 int FilterThread::duration() const
 {
   const qint64 elapsed = _startTime.elapsed();
-  return static_cast<int>(qBound<qint64>(0, elapsed, (std::numeric_limits<int>::max)()));
+  const qint64 maxInt = (std::numeric_limits<int>::max)();
+  return static_cast<int>(std::max<qint64>(0, std::min<qint64>(elapsed, maxInt)));
 }
 
 float FilterThread::progress() const
