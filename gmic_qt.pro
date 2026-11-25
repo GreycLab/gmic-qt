@@ -1,8 +1,17 @@
 #
 # Set HOST variable to define target host software.
-# Possible values are "none", "gimp", and "paintdotnet"
+# Possible values are "none", "gimp", "paintdotnet" and "8bf"
 #
 #
+
+# The helper scripts (pre_version.sh, check_versions.sh, pkg-config-check.sh)
+# are run through bash, which therefore has to be available in the PATH.
+!system(bash -c true):error("bash was not found in the PATH (it is required by the helper scripts)")
+
+# Helper scripts are located relatively to this file, not to the build directory
+PRE_VERSION_SH = $$system_quote($$PWD/pre_version.sh)
+CHECK_VERSIONS_SH = $$system_quote($$PWD/check_versions.sh)
+PKG_CONFIG_CHECK_SH = $$system_quote($$PWD/pkg-config-check.sh)
 
 !defined(HOST,var) { HOST = gimp }
 
@@ -12,11 +21,18 @@
 
 !defined(PRERELEASE, var) {
 # calling 'date' directly crashes on MSYS2!
-   PRERELEASE = $$system(bash pre_version.sh)
+   PRERELEASE = $$system(bash $$PRE_VERSION_SH)
 }
 
 # Possible values are "gcc" or "clang"
-!defined(COMPILER,var) { COMPILER = gcc }
+# Default: "clang" if the qmake spec selects clang, "gcc" otherwise
+!defined(COMPILER,var) {
+  clang {
+    COMPILER = clang
+  } else {
+    COMPILER = gcc
+  }
+}
 
 # Possible values are "on" or "off"
 !defined(LTO,var) { LTO=off }
@@ -24,21 +40,33 @@
 # Possible values are "on" or "off"
 !defined(SDL3,var) { SDL3=off }
 
-#
-#
-#
-#
+# Possible values are "on" or "off".
+# Use "off" to keep the binary unstripped (e.g. for distribution packaging)
+!defined(STRIP_BINARY,var) { STRIP_BINARY = on }
 
 # For debugging purpose
 !defined(TIMING,var) { TIMING = off }
 
-# DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
+# Option values are case insensitive
+HOST = $$lower($$HOST)
+COMPILER = $$lower($$COMPILER)
+GMIC_DYNAMIC_LINKING = $$lower($$GMIC_DYNAMIC_LINKING)
+ASAN = $$lower($$ASAN)
+LTO = $$lower($$LTO)
+SDL3 = $$lower($$SDL3)
+STRIP_BINARY = $$lower($$STRIP_BINARY)
+TIMING = $$lower($$TIMING)
+OPENMP = $$lower($$OPENMP)
 
-greaterThan(QT_MAJOR_VERSION, 5) {
- message("Qt version >= 6.0.0")
- QMAKE_CXXFLAGS += -fPIE
- QMAKE_LFLAGS += -fPIE
+# Reject unknown values early (a typo would otherwise produce an empty build)
+!equals(HOST,"none"):!equals(HOST,"gimp"):!equals(HOST,"paintdotnet"):!equals(HOST,"8bf") {
+  error("Unsupported HOST value (" $$HOST "). Possible values are: none, gimp, paintdotnet, 8bf")
 }
+!equals(COMPILER,"gcc"):!equals(COMPILER,"clang") {
+  error("Unsupported COMPILER value (" $$COMPILER "). Possible values are: gcc, clang")
+}
+
+# DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 #
 # Check Qt version (>= 5.2)
@@ -48,13 +76,27 @@ equals(QT_MAJOR_VERSION,5) {
   !greaterThan(QT_MINOR_VERSION, 1):error("You need Qt 5.2 or greater to build this program.")
 }
 
+greaterThan(QT_MAJOR_VERSION, 5) {
+ message("Qt version >= 6.0.0")
+}
+
+# -fPIE is a GCC/Clang flag meaningless (or rejected) on Windows targets,
+# and it is the default on macOS.
+unix:!macx:greaterThan(QT_MAJOR_VERSION, 5) {
+ QMAKE_CXXFLAGS += -fPIE
+ QMAKE_LFLAGS += -fPIE
+}
+
+# The flags used below (-O3, -Wl,--stack, ...) are GCC/Clang flags
+msvc:error("MSVC is not supported by this project file. Use GCC (MinGW) or Clang.")
+
 DEFINES += QT_DEPRECATED_WARNINGS
 
 #
 # Check that pkg-config is installed (qmake error messages are misleading, if not)
 #
 
-!system(bash pkg-config-check.sh):error("pkg-config is not installed")
+!system(bash $$PKG_CONFIG_CHECK_SH):error("pkg-config is not installed")
 
 TEMPLATE = app
 QT += widgets network
@@ -67,7 +109,8 @@ VERSION = 0.0.0
 PKGCONFIG += fftw3 zlib libpng libjpeg libcurl
 
 equals( HOST, "gimp" ) {
-  GIMP_VERSION = $$system(bash check_versions.sh . gimp)
+  GIMP_VERSION = $$system(bash $$CHECK_VERSIONS_SH . gimp)
+  isEmpty(GIMP_VERSION):error("Could not determine the GIMP version (is the GIMP development package installed?)")
   message("GIMP major version is ............" $$GIMP_VERSION)
   PKGCONFIG += gimp-$${GIMP_VERSION}.0
 }
@@ -78,31 +121,39 @@ equals( HOST, "8bf") {
 
 DEFINES += cimg_use_cpp11=1
 DEFINES += cimg_use_fftw3 cimg_use_zlib
-DEFINES += cimg_use_abort gmic_is_parallel cimg_use_curl cimg_use_png cimg_use_jpeg
+DEFINES += cimg_use_curl cimg_use_png cimg_use_jpeg
 DEFINES += gmic_check_shared_images
 DEFINES += cimg_appname="\\\"gmic\\\""
 
-equals(TIMING, "on")|equals(TIMING,"ON") {
+equals(TIMING, "on") {
  DEFINES += _TIMING_ENABLED_
  message(Timing is enabled)
 }
 
-defined(GMIC_PATH, var) {
+#
+# Locate the G'MIC sources, in this order:
+#  1. qmake variable GMIC_PATH
+#  2. environment variable GMIC_PATH
+#  3. ../src
+#  4. ../gmic/src
+#
+isEmpty(GMIC_PATH):GMIC_PATH = $$(GMIC_PATH)
+!isEmpty(GMIC_PATH) {
   message("GMIC_PATH is set ("$$GMIC_PATH")")
 }
-!defined(GMIC_PATH, var):exists(../src/gmic.cpp) {
+isEmpty(GMIC_PATH):exists($$PWD/../src/gmic.cpp) {
   message(GMIC_PATH was not set: Found gmic sources in ../src)
-  GMIC_PATH = ../src
+  GMIC_PATH = $$clean_path($$PWD/../src)
 }
-!defined(GMIC_PATH, var):exists(../gmic/src/gmic.cpp) {
+isEmpty(GMIC_PATH):exists($$PWD/../gmic/src/gmic.cpp) {
   message(GMIC_PATH was not set: Found gmic sources in ../gmic/src)
-  GMIC_PATH = ../gmic/src
+  GMIC_PATH = $$clean_path($$PWD/../gmic/src)
 }
-defined(GMIC_PATH, var):!exists( $$GMIC_PATH/gmic.cpp ) {
- error("G'MIC repository was not found ("$$GMIC_PATH")")
-}
-!defined(GMIC_PATH, var) {
+isEmpty(GMIC_PATH) {
  error("GMIC_PATH variable not set, and no G'MIC source tree found")
+}
+!exists( $$GMIC_PATH/gmic.cpp ) {
+ error("G'MIC repository was not found ("$$GMIC_PATH")")
 }
 
 message("G'MIC repository was found ("$$GMIC_PATH")")
@@ -132,20 +183,18 @@ QMAKE_EXTRA_TARGETS += 'translations/%.qm' \
                        'translations/filters/%.qm' \
                        'translations/filters/%.ts'
 
-GMIC_VERSION = $$system(bash check_versions.sh $$GMIC_PATH gmic)
+GMIC_VERSION = $$system(bash $$CHECK_VERSIONS_SH $$system_quote($$GMIC_PATH) gmic)
+isEmpty(GMIC_VERSION):error("Could not determine the G'MIC version (check_versions.sh failed on "$$GMIC_PATH")")
 message("G'MIC version is ................." $$GMIC_VERSION)
 exists($$GMIC_PATH/CImg.h) {
- CIMG_VERSION = $$system(bash check_versions.sh $$GMIC_PATH CImg)
+ CIMG_VERSION = $$system(bash $$CHECK_VERSIONS_SH $$system_quote($$GMIC_PATH) CImg)
  message("CImg version is .................." $$CIMG_VERSION)
 }
 exists($$GMIC_PATH/gmic_stdlib_community.h) {
- STDLIB_VERSION = $$system(bash check_versions.sh $$GMIC_PATH stdlib)
+ STDLIB_VERSION = $$system(bash $$CHECK_VERSIONS_SH $$system_quote($$GMIC_PATH) stdlib)
  message("gmic_stdlib_community.h version is" $$STDLIB_VERSION)
 }
 exists($$GMIC_PATH/CImg.h):exists($$GMIC_PATH/gmic_stdlib_community.h) {
- GMIC_VERSION = $$system(bash check_versions.sh $$GMIC_PATH gmic)
- STDLIB_VERSION = $$system(bash check_versions.sh $$GMIC_PATH stdlib)
- CIMG_VERSION = $$system(bash check_versions.sh $$GMIC_PATH CImg)
  !equals(GMIC_VERSION, $$CIMG_VERSION):{
    error("Version numbers of files 'gmic.h' (" $$GMIC_VERSION ") and 'CImg.h' (" $$CIMG_VERSION ") mismatch")
  }
@@ -161,8 +210,12 @@ QMAKE_DISTCLEAN = \
 
 equals( COMPILER, "clang" ) {
  message("Compiler is clang++")
- QMAKE_CXX = clang++
- QMAKE_LINK = clang++
+ # Do not override a compiler already selected by the qmake spec
+ # (e.g. clang++-17, or a cross-compiler)
+ !clang {
+   QMAKE_CXX = clang++
+   QMAKE_LINK = clang++
+ }
 }
 
 !isEmpty(PRERELEASE) {
@@ -175,7 +228,8 @@ LIBS += -lfftw3_threads
 win32 {
   DEFINES += _IS_WINDOWS_
   DEFINES += cimg_display=2
-  LIBS += -mwindows -lpthread -DPSAPI_VERSION=1 -lpsapi -lgdi32 -Wl,--stack,16777216
+  DEFINES += PSAPI_VERSION=1
+  LIBS += -mwindows -lpthread -lpsapi -lgdi32 -Wl,--stack,16777216
   message( Windows/GDI32 platform )
 }
 
@@ -256,6 +310,9 @@ equals( HOST, "8bf") {
 # Notes:
 #  - the compiler name is g++-4.8 on Homebrew and g++-mp-4.8 on MacPorts
 #  - we use the unsupported/macx-clang config because macx-g++ uses arch flags that are not recognized by GNU GCC
+# use qmake OPENMP=off to disable it
+equals(OPENMP,"off") { CONFIG -= openmp }
+
 openmp:equals(COMPILER,"gcc") {
     message("OpenMP enabled, with g++")
     DEFINES += cimg_use_openmp
@@ -268,14 +325,19 @@ openmp:equals(COMPILER,"gcc") {
 openmp:equals(COMPILER,"clang") {
     message("OpenMP enabled, with clang++")
     DEFINES += cimg_use_openmp
-    QMAKE_CXXFLAGS_DEBUG += -fopenmp=libomp -I/usr/lib/gcc/x86_64-redhat-linux/7/include/
-    QMAKE_CXXFLAGS_RELEASE += -fopenmp=libomp  -I/usr/lib/gcc/x86_64-redhat-linux/7/include/
+    QMAKE_CXXFLAGS_DEBUG += -fopenmp=libomp
+    QMAKE_CXXFLAGS_RELEASE += -fopenmp=libomp
     QMAKE_LFLAGS_DEBUG += -fopenmp=libomp
     QMAKE_LFLAGS_RELEASE += -fopenmp=libomp
+    # Some setups need an extra directory to find omp.h, for example:
+    #   qmake CLANG_OPENMP_INCLUDEPATH=/usr/lib/gcc/x86_64-redhat-linux/7/include
+    !isEmpty(CLANG_OPENMP_INCLUDEPATH) {
+        QMAKE_CXXFLAGS_DEBUG += -I$$CLANG_OPENMP_INCLUDEPATH
+        QMAKE_CXXFLAGS_RELEASE += -I$$CLANG_OPENMP_INCLUDEPATH
+    }
 }
 
-equals(LTO,"on") { LTO = ON }
-CONFIG(release, debug|release):gcc|clang:equals(LTO,"ON") {
+CONFIG(release, debug|release):gcc|clang:equals(LTO,"on") {
     message("Link Time Optimizer enabled")
     QMAKE_CXXFLAGS_RELEASE += -flto
     QMAKE_LFLAGS_RELEASE += -flto
@@ -450,13 +512,17 @@ SOURCES += \
   src/Widgets/LanguageSelectionWidget.cpp \
   src/Widgets/ProgressInfoWindow.cpp
 
-equals(GMIC_DYNAMIC_LINKING, "on" )|equals(GMIC_DYNAMIC_LINKING, "ON" ) {
+equals(GMIC_DYNAMIC_LINKING, "on") {
   message(Dynamic linking with libgmic)
-  LIBS += -Wl,-rpath,. $$GMIC_PATH/libgmic.so
-}
-
-equals(GMIC_DYNAMIC_LINKING, "off" )|equals(GMIC_DYNAMIC_LINKING, "OFF" ) {
-   SOURCES += $$GMIC_PATH/gmic.cpp
+  win32 {
+    LIBS += $$GMIC_PATH/libgmic.dll
+  } else:macx {
+    LIBS += -Wl,-rpath,@executable_path $$GMIC_PATH/libgmic.dylib
+  } else {
+    LIBS += -Wl,-rpath,. $$GMIC_PATH/libgmic.so
+  }
+} else {
+  SOURCES += $$GMIC_PATH/gmic.cpp
 }
 
 # ALL_FORMS
@@ -501,7 +567,8 @@ RESOURCES += wip_translations.qrc
 # TRANSLATIONS += translations/filters/fr.ts
 
 QMAKE_CXXFLAGS_RELEASE += -O3
-QMAKE_LFLAGS_RELEASE += -s
+# Apple's linker ignores (and warns about) -s
+!macx:equals(STRIP_BINARY,"on") { QMAKE_LFLAGS_RELEASE += -s }
 QMAKE_CXXFLAGS_DEBUG += -Dcimg_verbosity=3
 
 unix { DEFINES += cimg_use_vt100 }
@@ -517,10 +584,23 @@ CONFIG(debug, debug|release) {
 #    QMAKE_CXXFLAGS_DEBUG += -Wfatal-errors
 }
 
-equals(ASAN,"on")|equals(ASAN,"ON") {
+equals(ASAN,"on") {
     message(Address sanitizer enabled)
     QMAKE_CXXFLAGS_DEBUG += -fsanitize=address
     QMAKE_LFLAGS_DEBUG += -fsanitize=address
+}
+
+#
+# List every missing pkg-config module at once, instead of
+# failing on the first one with a cryptic compiler/linker error
+#
+isEmpty(PKG_CONFIG):PKG_CONFIG = pkg-config
+GMIC_MISSING_PKGS =
+for(pkg, PKGCONFIG) {
+  !system($$PKG_CONFIG --exists $$pkg):GMIC_MISSING_PKGS += $$pkg
+}
+!isEmpty(GMIC_MISSING_PKGS) {
+  error("Missing pkg-config modules: "$$GMIC_MISSING_PKGS". Install the corresponding development packages.")
 }
 
 UI_DIR = .ui
