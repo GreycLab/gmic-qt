@@ -116,7 +116,7 @@ endif()
 #
 # G'MIC library
 #
-option(ENABLE_SYSTEM_GMIC "Find GMIC shared library installed on the system" ON)
+option(ENABLE_SYSTEM_GMIC "Find GMIC shared library installed on the system" OFF)
 
 if (ENABLE_SYSTEM_GMIC)
   option(ENABLE_DYNAMIC_LINKING "Dynamically link the binaries to the GMIC shared library" ON)
@@ -251,7 +251,6 @@ find_package(Qt${QT_VERSION_MAJOR} ${MIN_QT_VERSION}
         Gui
         Widgets
         Network
-        LinguistTools
 )
 
 #
