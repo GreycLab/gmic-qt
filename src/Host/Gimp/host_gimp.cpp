@@ -235,9 +235,26 @@ void updateWholeDrawable(_GimpLayerPtr layer)
 }
 
 // GEGL gives/expects interleaved float pixels in [0,1]; G'MIC uses planar pixels in [0,255].
-// The conversion is done in ONE pass (scale + re-layout), instead of "operator*=" followed by the
-// generic (strided, single-threaded) permute_axes() which also allocates and copies a second buffer.
-// src: interleaved (c fastest), dst: planar, both with pixelsPerPlane * spectrum floats.
+//
+// Two strategies are available for the conversion:
+//
+//  - "in place": the GEGL pixels are read into (or written from) the G'MIC image buffer itself,
+//    and the interleaved <-> planar re-layout is done by CImg<T>::permute_axes() (reduced-buffer
+//    implementation, which only needs a small temporary buffer). Only ONE image-sized buffer is
+//    ever alive: the memory peak is N floats instead of 2N.
+//
+//  - "out of place": the conversion (scale + re-layout) is done in ONE multi-threaded pass between
+//    two image-sized buffers (2N floats at peak). It is faster for small images, for which the
+//    memory is not an issue, hence it is used below InPlaceMinFloats and for shared images.
+//
+// Single-channel images need no re-layout at all (planar == interleaved): they are always
+// converted in place.
+//
+// InPlaceMinFloats (number of float values of the image) is the size from which the in-place
+// permutation is preferred. It is a tuning knob: adjust it according to benchmarks.
+constexpr long long InPlaceMinFloats = 8LL * 1024 * 1024; // 32 MiB
+
+// Out of place: src is interleaved (c fastest), dst is planar, both with pixelsPerPlane * spectrum floats.
 void interleavedToPlanar255(const float * src, float * dst, long long pixelsPerPlane, int spectrum)
 {
   cimg_pragma_openmp(parallel for cimg_openmp_if(pixelsPerPlane >= 32768))
@@ -249,7 +266,7 @@ void interleavedToPlanar255(const float * src, float * dst, long long pixelsPerP
   }
 }
 
-// Inverse operation: planar [0,255] -> interleaved [0,1].
+// Out of place, inverse operation: planar [0,255] -> interleaved [0,1].
 void planar255ToInterleaved(const float * src, float * dst, long long pixelsPerPlane, int spectrum)
 {
   cimg_pragma_openmp(parallel for cimg_openmp_if(pixelsPerPlane >= 32768))
@@ -261,16 +278,57 @@ void planar255ToInterleaved(const float * src, float * dst, long long pixelsPerP
   }
 }
 
-// Writes a G'MIC image (planar, [0,255]) into a GEGL buffer. The image is released as soon as it
-// has been converted, to lower the memory peak.
+// Reads a region of a GEGL buffer into a G'MIC image (planar, [0,255]) of size
+// (rect->width, rect->height, 1, spectrum). The previous content of result is discarded.
+void readBufferToPlanar255(GeglBuffer * buffer, const GeglRectangle * rect, const char * format, int spectrum, gmic_library::gmic_image<float> & result)
+{
+  const int width = rect->width;
+  const int height = rect->height;
+  const long long floatsCount = (long long)width * height * spectrum;
+  if (spectrum == 1) {
+    // Planar == interleaved: read directly in the final buffer.
+    result.assign(width, height, 1, 1); // Not initialized
+    gegl_buffer_get(buffer, rect, 1, babl_format(format), result.data(), 0, GEGL_ABYSS_NONE);
+    result *= 255.0f;
+  } else if (floatsCount >= InPlaceMinFloats) {
+    // In place: the interleaved pixels are read in the final buffer, seen as a (spectrum,width,height) image,
+    // which is then re-laid out as (width,height,1,spectrum) by the reduced-buffer permute_axes().
+    result.assign(spectrum, width, height, 1); // Not initialized
+    gegl_buffer_get(buffer, rect, 1, babl_format(format), result.data(), 0, GEGL_ABYSS_NONE);
+    result.permute_axes("yzcx");
+    result *= 255.0f;
+  } else {
+    // Out of place (small image).
+    gmic_library::gmic_image<float> interleaved(spectrum, width, height); // Not initialized
+    gegl_buffer_get(buffer, rect, 1, babl_format(format), interleaved.data(), 0, GEGL_ABYSS_NONE);
+    result.assign(width, height, 1, spectrum); // Not initialized
+    interleavedToPlanar255(interleaved.data(), result.data(), (long long)width * height, spectrum);
+  }
+}
+
+// Writes a G'MIC image (planar, [0,255]) into a GEGL buffer.
+// The image is CONSUMED: it is modified in place (and its dimensions may change) when the in-place
+// strategy is used, and it is released before returning in all cases.
 void writePlanar255ToBuffer(GeglBuffer * buffer, const GeglRectangle * rect, gmic_library::gmic_image<gmic_pixel_type> & img)
 {
   const int spectrum = img.spectrum();
   const char * const format = spectrum == 1 ? "Y' float" : spectrum == 2 ? "Y'A float" : spectrum == 3 ? "R'G'B' float" : "R'G'B'A float";
-  gmic_library::gmic_image<float> interleaved(spectrum, img.width(), img.height(), img.depth()); // Not initialized
-  planar255ToInterleaved(img.data(), interleaved.data(), (long long)img.width() * img.height() * img.depth(), spectrum);
-  img.assign();
-  gegl_buffer_set(buffer, rect, 0, babl_format(format), interleaved.data(), 0);
+  const long long pixelsPerPlane = (long long)img.width() * img.height() * img.depth();
+  // A shared image must not be modified: its buffer belongs to someone else.
+  const bool inPlace = !img.is_shared() && (spectrum == 1 || pixelsPerPlane * spectrum >= InPlaceMinFloats);
+  if (inPlace) {
+    if (spectrum > 1) {
+      img.permute_axes("cxyz"); // (x,y,z,c) -> (c,x,y,z), reduced-buffer implementation
+    }
+    img /= 255.0f;
+    gegl_buffer_set(buffer, rect, 0, babl_format(format), img.data(), 0);
+    img.assign();
+  } else {
+    gmic_library::gmic_image<float> interleaved(spectrum, img.width(), img.height(), img.depth()); // Not initialized
+    planar255ToInterleaved(img.data(), interleaved.data(), pixelsPerPlane, spectrum);
+    img.assign();
+    gegl_buffer_set(buffer, rect, 0, babl_format(format), interleaved.data(), 0);
+  }
 }
 
 QMap<GimpLayerModeEffects, QString> reverseBlendingModeMap(const QMap<QString, GimpLayerModeEffects> & string2mode)
@@ -637,12 +695,9 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
     gegl_rectangle_set(&rect, ix, iy, iw, ih);
     GeglBuffer * buffer = gimp_drawable_get_buffer(_GIMP_DRAWABLE(inputLayers[l]));
     const char * const format = spectrum == 1 ? "Y' " gmic_pixel_type_str : spectrum == 2 ? "Y'A " gmic_pixel_type_str : spectrum == 3 ? "R'G'B' " gmic_pixel_type_str : "R'G'B'A " gmic_pixel_type_str;
-    gmic_image<float> interleaved(spectrum, iw, ih); // Not initialized
-    gegl_buffer_get(buffer, &rect, 1, babl_format(format), interleaved.data(), 0, GEGL_ABYSS_NONE);
+    gmic_image<float> img;
+    readBufferToPlanar255(buffer, &rect, format, spectrum, img);
     g_object_unref(buffer);
-    gmic_image<float> img(iw, ih, 1, spectrum);
-    interleavedToPlanar255(interleaved.data(), img.data(), (long long)iw * ih, spectrum);
-    interleaved.assign();
     img.move_to(images[l]);
   }
 }
