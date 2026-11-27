@@ -141,6 +141,11 @@ void GmicProcessor::execute()
       CroppedImageListProxy::get(*_gmicImages, imageNames, rect.x, rect.y, rect.w, rect.h, _filterContext.inputOutputState.inputMode, _filterContext.zoomFactor);
       updateImageNames(imageNames);
     }
+  } else if (_filterContext.requestType == FilterContext::RequestType::FullImage) {
+    // Final processing: the cache is cleared once the images have been sent back to the host (see
+    // onApplyThreadFinished()), so its content is moved instead of copied: this avoids keeping a
+    // second copy of all the layers alive during the whole filter execution.
+    CroppedImageListProxy::take(*_gmicImages, imageNames, rect.x, rect.y, rect.w, rect.h, _filterContext.inputOutputState.inputMode, 1.0);
   } else {
     CroppedImageListProxy::get(*_gmicImages, imageNames, rect.x, rect.y, rect.w, rect.h, _filterContext.inputOutputState.inputMode, 1.0);
   }

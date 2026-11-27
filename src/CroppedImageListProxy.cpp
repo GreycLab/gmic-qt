@@ -75,6 +75,21 @@ void CroppedImageListProxy::get(gmic_library::gmic_list<gmic_pixel_type> & image
   imageNames = *_cachedImageNames;
 }
 
+void CroppedImageListProxy::take(gmic_library::gmic_list<gmic_pixel_type> & images, gmic_library::gmic_list<char> & imageNames,
+                                 double x, double y, double width, double height, InputMode mode, double zoom)
+{
+  std::lock_guard<std::recursive_mutex> lock(proxyMutex());
+  if ((x != _x) || (y != _y) || (width != _width) || (height != _height) || (mode != _inputMode) || (zoom != _zoom)) {
+    update(x, y, width, height, mode, zoom);
+  }
+  // Swapping exchanges the buffers: no pixel is copied and nothing is allocated. Whatever the
+  // arguments contained before is released by clear(), which also invalidates the cached parameters,
+  // so that any later get() reloads the images from the host.
+  images.swap(*_cachedImageList);
+  imageNames.swap(*_cachedImageNames);
+  clear();
+}
+
 void CroppedImageListProxy::update(double x, double y, double width, double height, InputMode mode, double zoom)
 {
   std::lock_guard<std::recursive_mutex> lock(proxyMutex());

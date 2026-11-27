@@ -42,6 +42,10 @@ public:
   CroppedImageListProxy() = delete;
 
   static void get(gmic_library::gmic_list<gmic_pixel_type> & images, gmic_library::gmic_list<char> & imageNames, double x, double y, double width, double height, InputMode mode, double zoom);
+  // Same as get(), but the cached images are MOVED into `images` (no deep copy of the pixels) and the
+  // cache is cleared. To be used for the final, full resolution processing, after which the cache is
+  // cleared anyway: it avoids keeping a second copy of all the layers alive during the filter execution.
+  static void take(gmic_library::gmic_list<gmic_pixel_type> & images, gmic_library::gmic_list<char> & imageNames, double x, double y, double width, double height, InputMode mode, double zoom);
   static void update(double x, double y, double width, double height, InputMode mode, double zoom);
   static void clear();
 
