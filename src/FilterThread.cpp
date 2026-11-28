@@ -198,7 +198,10 @@ bool FilterThread::failed() const
 
 bool FilterThread::aborted() const
 {
-  return _gmicAbort;
+  float value;
+  cimg_pragma_openmp(atomic read)
+  value = _gmicAbort;
+  return value;
 }
 
 int FilterThread::duration() const
@@ -210,7 +213,10 @@ int FilterThread::duration() const
 
 float FilterThread::progress() const
 {
-  return _gmicProgress;
+  float value;
+  cimg_pragma_openmp(atomic read)
+  value = _gmicProgress;
+  return value;
 }
 
 QString FilterThread::fullCommand() const
@@ -227,6 +233,7 @@ void FilterThread::setLogSuffix(const QString & text)
 
 void FilterThread::abortGmic()
 {
+  cimg_pragma_openmp(atomic write)
   _gmicAbort = true;
 }
 
@@ -241,18 +248,24 @@ void FilterThread::run()
     appendWithSpace(fullCommandLine, _arguments);
     // Note: _gmicAbort is initialized by the constructor and must not be reset here, otherwise an
     // abortGmic() call made between start() and the actual execution of run() would be lost.
+    cimg_pragma_openmp(atomic write)
     _gmicProgress = -1;
     Logger::log(fullCommandLine, _logSuffix, true);
     // These buffers must outlive the calls below which use their content
     const QByteArray environment = _environment.toLocal8Bit();
     const QByteArray commandLine = fullCommandLine.toLocal8Bit();
-    if (_gmicAbort) { // Aborted before the start: skip the (costly) initialization of the interpreter
+    bool __gmicAbort;
+    cimg_pragma_openmp(atomic read)
+    __gmicAbort = _gmicAbort;
+    if (__gmicAbort) { // Aborted before the start: skip the (costly) initialization of the interpreter
       _images->assign();
       _imageNames->assign();
       return;
     }
     gmic gmicInstance(environment.isEmpty() ? nullptr : environment.constData(), GmicStdLib::Array.constData(), true, &_gmicProgress, &_gmicAbort, 0.0f);
-    if (_gmicAbort) { // Aborted during the initialization
+    cimg_pragma_openmp(atomic read)
+    __gmicAbort = _gmicAbort;
+    if (__gmicAbort) { // Aborted during the initialization
       _images->assign();
       _imageNames->assign();
       return;
@@ -293,6 +306,3 @@ void FilterThread::run()
 }
 
 } // namespace GmicQt
-
-
-

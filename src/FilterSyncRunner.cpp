@@ -115,12 +115,18 @@ bool FilterSyncRunner::failed() const
 
 bool FilterSyncRunner::aborted() const
 {
-  return _gmicAbort;
+  float value;
+  cimg_pragma_openmp(atomic read)
+  value = _gmicAbort;
+  return value;
 }
 
 float FilterSyncRunner::progress() const
 {
-  return _gmicProgress;
+  float value;
+  cimg_pragma_openmp(atomic read)
+  value = _gmicProgress;
+  return value;
 }
 
 QString FilterSyncRunner::fullCommand() const
@@ -137,6 +143,7 @@ void FilterSyncRunner::setLogSuffix(const QString & text)
 
 void FilterSyncRunner::abortGmic()
 {
+  cimg_pragma_openmp(atomic write)
   _gmicAbort = true;
 }
 
@@ -158,7 +165,9 @@ void FilterSyncRunner::run()
     fullCommandLine = commandFromOutputMessageMode(Settings::outputMessageMode());
     appendWithSpace(fullCommandLine, _command);
     appendWithSpace(fullCommandLine, _arguments);
+    cimg_pragma_openmp(atomic write)
     _gmicAbort = false;
+    cimg_pragma_openmp(atomic write)
     _gmicProgress = -1;
     Logger::log(fullCommandLine, _logSuffix, true);
     const QByteArray environment = _environment.toLocal8Bit(); // Must outlive the construction of the interpreter
@@ -188,6 +197,3 @@ void FilterSyncRunner::run()
 }
 
 } // namespace GmicQt
-
-
-
