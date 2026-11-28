@@ -33,7 +33,9 @@
 #include <cstring>
 #include <limits>
 #include <list>
+#include <memory>
 #include <stack>
+#include <type_traits>
 #include <vector>
 #ifdef _IS_WINDOWS_
 #include <QTextCodec>
@@ -234,101 +236,231 @@ void updateWholeDrawable(_GimpLayerPtr layer)
   gimp_drawable_update(drawable, 0, 0, _gimp_drawable_get_width(drawable), _gimp_drawable_get_height(drawable));
 }
 
-// GEGL gives/expects interleaved float pixels in [0,1]; G'MIC uses planar pixels in [0,255].
+// GEGL gives/expects interleaved pixels (floats in [0,1], or 8-bit integers in [0,255]) whereas G'MIC uses planar
+// float pixels in [0,255]. The re-layout (interleaved <-> planar) and the scaling are done in ONE multi-threaded
+// pass, strip by strip (see forEachStrip()):
 //
-// Two strategies are available for the conversion:
-//
-//  - "in place": the GEGL pixels are read into (or written from) the G'MIC image buffer itself,
-//    and the interleaved <-> planar re-layout is done by CImg<T>::permute_axes() (reduced-buffer
-//    implementation, which only needs a small temporary buffer). Only ONE image-sized buffer is
-//    ever alive: the memory peak is N floats instead of 2N.
-//
-//  - "out of place": the conversion (scale + re-layout) is done in ONE multi-threaded pass between
-//    two image-sized buffers (2N floats at peak). It is faster for small images, for which the
-//    memory is not an issue, hence it is used below InPlaceMinFloats and for shared images.
-//
-// Single-channel images need no re-layout at all (planar == interleaved): they are always
-// converted in place.
-//
-// InPlaceMinFloats (number of float values of the image) is the size from which the in-place
-// permutation is preferred. It is a tuning knob: adjust it according to benchmarks.
-constexpr long long InPlaceMinFloats = 8LL * 1024 * 1024; // 32 MiB
+//  - only a small temporary buffer (about StripPixels pixels) is needed, so the memory peak is the size of the
+//    G'MIC image itself, whatever the size of the image (no image-sized temporary buffer, no permute_axes());
+//  - the temporary buffer stays in the CPU caches between the GEGL access and the conversion;
+//  - when the layer is natively stored with 8 bits per channel (by far the most usual case: "R'G'B'A u8",
+//    "Y' u8", etc.), the pixels are exchanged with GEGL in that very format. No babl conversion, no scaling pass,
+//    and a temporary buffer which is 4 times smaller. Other precisions (16 bits, float, linear light) go through
+//    the matching "float" formats, for which babl does the conversion.
+static_assert(std::is_same<gmic_pixel_type, float>::value, "host_gimp.cpp assumes that G'MIC pixels are floats");
 
-// Out of place: src is interleaved (c fastest), dst is planar, both with pixelsPerPlane * spectrum floats.
-void interleavedToPlanar255(const float * src, float * dst, long long pixelsPerPlane, int spectrum)
+// Approximate number of pixels exchanged with GEGL at once (4 MiB for an 8-bit RGBA strip, 16 MiB for a float one).
+constexpr long long StripPixels = 1LL << 20;
+
+// Strip boundaries are aligned on multiples of this number of rows (GEGL tiles are 128 pixels wide and 64 or 128
+// pixels high), so that the tiles are not fetched twice.
+constexpr int StripRowsAlignment = 128;
+
+// Names of the babl formats matching a number of channels, for 8-bit or float samples.
+const char * pixelFormatName(int spectrum, bool u8)
 {
-  cimg_pragma_openmp(parallel for cimg_openmp_if(pixelsPerPlane >= 32768))
-  for (long long i = 0; i < pixelsPerPlane; ++i) {
-    const float * p = src + i * spectrum;
-    for (int c = 0; c < spectrum; ++c) {
-      dst[c * pixelsPerPlane + i] = p[c] * 255.0f;
+  switch (spectrum) {
+  case 1:
+    return u8 ? "Y' u8" : "Y' float";
+  case 2:
+    return u8 ? "Y'A u8" : "Y'A float";
+  case 3:
+    return u8 ? "R'G'B' u8" : "R'G'B' float";
+  default:
+    return u8 ? "R'G'B'A u8" : "R'G'B'A float";
+  }
+}
+
+// Maximum number of rows of a strip of the given width.
+int maxStripRows(int width)
+{
+  const int rows = static_cast<int>(StripPixels / std::max(1, width) / StripRowsAlignment) * StripRowsAlignment;
+  return std::max(StripRowsAlignment, rows);
+}
+
+// Calls f(y, rows) for consecutive strips covering the rows [rect.y, rect.y + rect.height) of a rectangle.
+template <typename F> void forEachStrip(const GeglRectangle & rect, F && f)
+{
+  const int maxRows = maxStripRows(rect.width);
+  const int yEnd = rect.y + rect.height;
+  int y = rect.y;
+  while (y < yEnd) {
+    int stripEnd = ((y + maxRows) / StripRowsAlignment) * StripRowsAlignment; // Aligned on the tiles
+    if (stripEnd <= y) {
+      stripEnd = y + maxRows;
+    }
+    stripEnd = std::min(stripEnd, yEnd);
+    f(y, stripEnd - y);
+    y = stripEnd;
+  }
+}
+
+// Interleaved -> planar conversion of "pixels" pixels, each sample being multiplied by "scale".
+// planeSize is the distance between two channels of the destination.
+template <int Channels, typename T> void interleavedToPlanarN(const T * src, float * dst, long long pixels, long long planeSize, float scale)
+{
+  cimg_pragma_openmp(parallel for cimg_openmp_if(pixels >= 32768))
+  for (long long i = 0; i < pixels; ++i) {
+    const T * p = src + i * Channels;
+    for (int c = 0; c < Channels; ++c) {
+      dst[c * planeSize + i] = static_cast<float>(p[c]) * scale;
     }
   }
 }
 
-// Out of place, inverse operation: planar [0,255] -> interleaved [0,1].
-void planar255ToInterleaved(const float * src, float * dst, long long pixelsPerPlane, int spectrum)
+template <typename T> void interleavedToPlanar(const T * src, float * dst, long long pixels, long long planeSize, int channels, float scale)
 {
-  cimg_pragma_openmp(parallel for cimg_openmp_if(pixelsPerPlane >= 32768))
-  for (long long i = 0; i < pixelsPerPlane; ++i) {
-    float * p = dst + i * spectrum;
-    for (int c = 0; c < spectrum; ++c) {
-      p[c] = src[c * pixelsPerPlane + i] / 255.0f;
+  switch (channels) {
+  case 1:
+    interleavedToPlanarN<1>(src, dst, pixels, planeSize, scale);
+    break;
+  case 2:
+    interleavedToPlanarN<2>(src, dst, pixels, planeSize, scale);
+    break;
+  case 3:
+    interleavedToPlanarN<3>(src, dst, pixels, planeSize, scale);
+    break;
+  default:
+    interleavedToPlanarN<4>(src, dst, pixels, planeSize, scale);
+    break;
+  }
+}
+
+// Planar -> interleaved conversion of "pixels" pixels, each sample being transformed by convert().
+template <int Channels, typename T, typename Convert> void planarToInterleavedN(const float * src, T * dst, long long pixels, long long planeSize, Convert convert)
+{
+  cimg_pragma_openmp(parallel for cimg_openmp_if(pixels >= 32768))
+  for (long long i = 0; i < pixels; ++i) {
+    T * p = dst + i * Channels;
+    for (int c = 0; c < Channels; ++c) {
+      p[c] = convert(src[c * planeSize + i]);
     }
   }
 }
+
+template <typename T, typename Convert> void planarToInterleaved(const float * src, T * dst, long long pixels, long long planeSize, int channels, Convert convert)
+{
+  switch (channels) {
+  case 1:
+    planarToInterleavedN<1>(src, dst, pixels, planeSize, convert);
+    break;
+  case 2:
+    planarToInterleavedN<2>(src, dst, pixels, planeSize, convert);
+    break;
+  case 3:
+    planarToInterleavedN<3>(src, dst, pixels, planeSize, convert);
+    break;
+  default:
+    planarToInterleavedN<4>(src, dst, pixels, planeSize, convert);
+    break;
+  }
+}
+
+// [0,255] float -> 8 bits integer, rounded and clamped (NaN gives 0), as babl does.
+struct FloatToU8 {
+  unsigned char operator()(float v) const { return !(v > 0.0f) ? 0 : (v >= 255.0f ? 255 : static_cast<unsigned char>(v + 0.5f)); }
+};
+
+// [0,255] float -> [0,1] float.
+struct Float255ToUnit {
+  float operator()(float v) const { return v / 255.0f; }
+};
 
 // Reads a region of a GEGL buffer into a G'MIC image (planar, [0,255]) of size
 // (rect->width, rect->height, 1, spectrum). The previous content of result is discarded.
-void readBufferToPlanar255(GeglBuffer * buffer, const GeglRectangle * rect, const char * format, int spectrum, gmic_library::gmic_image<float> & result)
+void readBufferToPlanar255(GeglBuffer * buffer, const GeglRectangle * rect, int spectrum, gmic_library::gmic_image<float> & result)
 {
   const int width = rect->width;
   const int height = rect->height;
-  const long long floatsCount = (long long)width * height * spectrum;
-  if (spectrum == 1) {
-    // Planar == interleaved: read directly in the final buffer.
-    result.assign(width, height, 1, 1); // Not initialized
-    gegl_buffer_get(buffer, rect, 1, babl_format(format), result.data(), 0, GEGL_ABYSS_NONE);
-    result *= 255.0f;
-  } else if (floatsCount >= InPlaceMinFloats) {
-    // In place: the interleaved pixels are read in the final buffer, seen as a (spectrum,width,height) image,
-    // which is then re-laid out as (width,height,1,spectrum) by the reduced-buffer permute_axes().
-    result.assign(spectrum, width, height, 1); // Not initialized
-    gegl_buffer_get(buffer, rect, 1, babl_format(format), result.data(), 0, GEGL_ABYSS_NONE);
-    result.permute_axes("yzcx");
-    result *= 255.0f;
-  } else {
-    // Out of place (small image).
-    gmic_library::gmic_image<float> interleaved(spectrum, width, height); // Not initialized
-    gegl_buffer_get(buffer, rect, 1, babl_format(format), interleaved.data(), 0, GEGL_ABYSS_NONE);
-    result.assign(width, height, 1, spectrum); // Not initialized
-    interleavedToPlanar255(interleaved.data(), result.data(), (long long)width * height, spectrum);
+  result.assign(width, height, 1, spectrum); // Not initialized
+  if (result.is_empty()) {
+    return;
   }
+  const long long planeSize = (long long)width * height;
+  float * const dst = result.data();
+  const size_t stripRows = std::min(height, maxStripRows(width));
+  const Babl * const u8Format = babl_format(pixelFormatName(spectrum, true));
+
+  if (gegl_buffer_get_format(buffer) == u8Format) {
+    // Native 8-bit layer: no babl conversion, the values are already in [0,255].
+    std::unique_ptr<unsigned char[]> strip(new unsigned char[stripRows * width * spectrum]);
+    forEachStrip(*rect, [&](int y, int rows) {
+      GeglRectangle r;
+      gegl_rectangle_set(&r, rect->x, y, width, rows);
+      gegl_buffer_get(buffer, &r, 1.0, u8Format, strip.get(), GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
+      interleavedToPlanar(strip.get(), dst + (long long)(y - rect->y) * width, (long long)width * rows, planeSize, spectrum, 1.0f);
+    });
+    return;
+  }
+
+  const Babl * const floatFormat = babl_format(pixelFormatName(spectrum, false));
+  if (spectrum == 1) {
+    // Planar == interleaved: each strip is read directly in its final place, then scaled while it is still in the cache.
+    forEachStrip(*rect, [&](int y, int rows) {
+      GeglRectangle r;
+      gegl_rectangle_set(&r, rect->x, y, width, rows);
+      float * const p = dst + (long long)(y - rect->y) * width;
+      gegl_buffer_get(buffer, &r, 1.0, floatFormat, p, GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
+      const long long n = (long long)width * rows;
+      cimg_pragma_openmp(parallel for cimg_openmp_if(n >= 65536))
+      for (long long i = 0; i < n; ++i) {
+        p[i] *= 255.0f;
+      }
+    });
+    return;
+  }
+
+  std::unique_ptr<float[]> strip(new float[stripRows * width * spectrum]);
+  forEachStrip(*rect, [&](int y, int rows) {
+    GeglRectangle r;
+    gegl_rectangle_set(&r, rect->x, y, width, rows);
+    gegl_buffer_get(buffer, &r, 1.0, floatFormat, strip.get(), GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
+    interleavedToPlanar(strip.get(), dst + (long long)(y - rect->y) * width, (long long)width * rows, planeSize, spectrum, 255.0f);
+  });
 }
 
-// Writes a G'MIC image (planar, [0,255]) into a GEGL buffer.
-// The image is CONSUMED: it is modified in place (and its dimensions may change) when the in-place
-// strategy is used, and it is released before returning in all cases.
+// Writes a G'MIC image (planar, [0,255]) into a GEGL buffer (the whole buffer if rect is null, the image
+// size must then match the buffer one). The image is CONSUMED: it is released before returning.
 void writePlanar255ToBuffer(GeglBuffer * buffer, const GeglRectangle * rect, gmic_library::gmic_image<gmic_pixel_type> & img)
 {
-  const int spectrum = img.spectrum();
-  const char * const format = spectrum == 1 ? "Y' float" : spectrum == 2 ? "Y'A float" : spectrum == 3 ? "R'G'B' float" : "R'G'B'A float";
-  const long long pixelsPerPlane = (long long)img.width() * img.height() * img.depth();
-  // A shared image must not be modified: its buffer belongs to someone else.
-  const bool inPlace = !img.is_shared() && (spectrum == 1 || pixelsPerPlane * spectrum >= InPlaceMinFloats);
-  if (inPlace) {
-    if (spectrum > 1) {
-      img.permute_axes("cxyz"); // (x,y,z,c) -> (c,x,y,z), reduced-buffer implementation
-    }
-    img /= 255.0f;
-    gegl_buffer_set(buffer, rect, 0, babl_format(format), img.data(), 0);
+  const GeglRectangle * const target = rect ? rect : gegl_buffer_get_extent(buffer);
+  const int width = img.width();
+  const int height = img.height();
+  const int spectrum = std::min(img.spectrum(), 4);
+  if (img.is_empty() || target->width != width || target->height != height) {
+    // Never let GEGL read outside of the image buffer.
+    qWarning("host_gimp: unexpected size of the image to write (%dx%d, expected %dx%d)", width, height, target->width, target->height);
     img.assign();
-  } else {
-    gmic_library::gmic_image<float> interleaved(spectrum, img.width(), img.height(), img.depth()); // Not initialized
-    planar255ToInterleaved(img.data(), interleaved.data(), pixelsPerPlane, spectrum);
-    img.assign();
-    gegl_buffer_set(buffer, rect, 0, babl_format(format), interleaved.data(), 0);
+    return;
   }
+  // The distance between two channels includes the depth, even if only the first slice is transferred.
+  const long long planeSize = (long long)width * height * img.depth();
+  const float * const src = img.data();
+  const size_t stripRows = std::min(height, maxStripRows(width));
+  const Babl * const u8Format = babl_format(pixelFormatName(spectrum, true));
+
+  if (gegl_buffer_get_format(buffer) == u8Format) {
+    // Native 8-bit layer: the babl conversion (and its scaling) is replaced by a rounding/clamping loop.
+    std::unique_ptr<unsigned char[]> strip(new unsigned char[stripRows * width * spectrum]);
+    forEachStrip(*target, [&](int y, int rows) {
+      planarToInterleaved(src + (long long)(y - target->y) * width, strip.get(), (long long)width * rows, planeSize, spectrum, FloatToU8());
+      GeglRectangle r;
+      gegl_rectangle_set(&r, target->x, y, width, rows);
+      gegl_buffer_set(buffer, &r, 0, u8Format, strip.get(), GEGL_AUTO_ROWSTRIDE);
+    });
+  } else {
+    const Babl * const floatFormat = babl_format(pixelFormatName(spectrum, false));
+    std::unique_ptr<float[]> strip(new float[stripRows * width * spectrum]);
+    forEachStrip(*target, [&](int y, int rows) {
+      planarToInterleaved(src + (long long)(y - target->y) * width, strip.get(), (long long)width * rows, planeSize, spectrum, Float255ToUnit());
+      GeglRectangle r;
+      gegl_rectangle_set(&r, target->x, y, width, rows);
+      gegl_buffer_set(buffer, &r, 0, floatFormat, strip.get(), GEGL_AUTO_ROWSTRIDE);
+    });
+  }
+  // Make sure that every tile is back in GIMP's core before gimp_drawable_merge_shadow() (as in the GIMP plug-in examples).
+  gegl_buffer_flush(buffer);
+  img.assign();
 }
 
 QMap<GimpLayerModeEffects, QString> reverseBlendingModeMap(const QMap<QString, GimpLayerModeEffects> & string2mode)
@@ -653,13 +785,14 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
     }
     const int spectrum = (gimp_drawable_is_rgb(_GIMP_DRAWABLE(inputLayers[l])) ? 3 : 1) + (gimp_drawable_has_alpha(_GIMP_DRAWABLE(inputLayers[l])) ? 1 : 0);
 
-    const int dw = static_cast<int>(_gimp_drawable_get_width(_GIMP_DRAWABLE(inputLayers[l])));
-    const int dh = static_cast<int>(_gimp_drawable_get_height(_GIMP_DRAWABLE(inputLayers[l])));
     int ix = rgn_x;
     int iy = rgn_y;
     int iw = rgn_width;
     int ih = rgn_height;
     if (!entireImage) {
+      // The size of the drawable is only needed here (each libgimp query is an IPC round trip).
+      const int dw = static_cast<int>(_gimp_drawable_get_width(_GIMP_DRAWABLE(inputLayers[l])));
+      const int dh = static_cast<int>(_gimp_drawable_get_height(_GIMP_DRAWABLE(inputLayers[l])));
       // Crop rectangle, clamped to the drawable so that sizes can never be negative
       ix = std::max(0, std::min(dw, static_cast<int>(rgn_x + x * rgn_width)));
       iy = std::max(0, std::min(dh, static_cast<int>(rgn_y + y * rgn_height)));
@@ -694,9 +827,8 @@ void getCroppedImages(gmic_list<float> & images, gmic_list<char> & imageNames, d
     GeglRectangle rect;
     gegl_rectangle_set(&rect, ix, iy, iw, ih);
     GeglBuffer * buffer = gimp_drawable_get_buffer(_GIMP_DRAWABLE(inputLayers[l]));
-    const char * const format = spectrum == 1 ? "Y' " gmic_pixel_type_str : spectrum == 2 ? "Y'A " gmic_pixel_type_str : spectrum == 3 ? "R'G'B' " gmic_pixel_type_str : "R'G'B'A " gmic_pixel_type_str;
     gmic_image<float> img;
-    readBufferToPlanar255(buffer, &rect, format, spectrum, img);
+    readBufferToPlanar255(buffer, &rect, spectrum, img);
     g_object_unref(buffer);
     img.move_to(images[l]);
   }
@@ -737,7 +869,6 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
     return; // Nothing to transfer back into GIMP (and we must not delete the input layers)
   }
 
-  const int image_nb_layers = static_cast<int>(getFlatLayersList(gmic_qt_gimp_image_id).size());
   const unsigned int image_width = _gimp_image_get_width(gmic_qt_gimp_image_id);
   const unsigned int image_height = _gimp_image_get_height(gmic_qt_gimp_image_id);
 
@@ -820,6 +951,8 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
         img.assign();
       }
     } else { // Indirect replacement: create new layers.
+      // Only needed here, and it must be evaluated before the layers are modified.
+      const bool allLayersAreInputs = (getFlatLayersList(gmic_qt_gimp_image_id).size() == inputLayers.size());
       gimp_selection_none(gmic_qt_gimp_image_id);
       // inputLayers may be empty (e.g. input mode "None"): insert at the top in that case.
       const int layer_pos = inputLayers.empty() ? 0 : gimp_image_get_item_position(gmic_qt_gimp_image_id, _GIMP_ITEM(inputLayers[0]));
@@ -878,7 +1011,7 @@ void outputImages(gmic_list<gmic_pixel_type> & images, const gmic_list<char> & i
         gimp_image_remove_layer(gmic_qt_gimp_image_id, inputLayers[p]);
       }
       if (max_width && max_height) { // gimp_image_resize() fails with a null size
-        if ((unsigned int)image_nb_layers == inputLayers.size()) {
+        if (allLayersAreInputs) {
           gimp_image_resize(gmic_qt_gimp_image_id, max_width, max_height, -top_left.x, -top_left.y);
         } else {
           gimp_image_resize(gmic_qt_gimp_image_id, std::max(image_width, max_width), std::max(image_height, max_height), 0, 0);
